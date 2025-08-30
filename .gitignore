@@ -1,0 +1,46 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual envs
+.venv/
+venv/
+.env/
+env/
+
+# Dotenv
+.env
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+
+# IDEs / editors
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pulumi
+.pulumi/
+Pulumi.*.yaml.backup

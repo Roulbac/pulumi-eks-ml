@@ -1,0 +1,15 @@
+name: starter
+description: A minimal starter project with a single EKS cluster in one region
+runtime:
+  name: python
+  options:
+    toolchain: uv
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: python
+  node_pools:
+    type: array
+    description: Karpenter node pool definitions (array of objects with instance_type).
+    items:
+      type: object

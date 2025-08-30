@@ -1,0 +1,34 @@
+[build-system]
+requires = ["uv_build>=0.8.14,<0.9.0"]
+build-backend = "uv_build"
+
+[project]
+name = "pulumi-eks-ml"
+version = "0.1.0"
+description = "Pulumi EKS ML Infrastructure"
+requires-python = ">=3.12"
+dependencies = [
+    "ipaddress>=1.0.23",
+    "passlib>=1.7.4",
+    "pulumi>=3.0.0,<4.0.0",
+    "pulumi-aws>=7.0.0,<8.0.0",
+    "pulumi-eks>=4.0.1",
+    "pulumi-kubernetes>=4.10.0",
+    "pulumi-random>=4.18.3",
+    "pyyaml>=6.0.2",
+]
+
+[tool.uv.build-backend]
+module-root = ""
+namespace = true
+module-name = ["pulumi-eks-ml"]
+
+[dependency-groups]
+dev = [
+    "boto3>=1.42.34",
+    "pulumi-automation>=0.1.0",
+    "pytest>=9.0.2",
+    "testcontainers[localstack]>=4.14.0",
+]
+
+
