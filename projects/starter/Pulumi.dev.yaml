@@ -1,7 +1,7 @@
 config:
   # Required by the AWS provider to know where to create resources.
   aws:region: us-west-2
-  starter:node_pools:
+  node_pools:
     - capacity_type: on-demand
       instance_type: t3.large
       name: general
