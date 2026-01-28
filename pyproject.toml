@@ -21,7 +21,7 @@ dependencies = [
 [tool.uv.build-backend]
 module-root = ""
 namespace = true
-module-name = ["pulumi-eks-ml"]
+module-name = ["pulumi_eks_ml"]
 
 [dependency-groups]
 dev = [
