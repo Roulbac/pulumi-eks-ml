@@ -4,8 +4,9 @@ build-backend = "uv_build"
 
 [project]
 name = "pulumi-eks-ml"
-version = "0.1.0"
+version = "0.1.1"
 description = "Pulumi EKS ML Infrastructure"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "ipaddress>=1.0.23",
