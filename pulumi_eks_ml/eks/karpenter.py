@@ -415,7 +415,7 @@ class KarpenterAddon(pulumi.ComponentResource):
 
     def _add_node_pool(self, node_pool: config.NodePoolConfig) -> None:
         node_class_resource = k8s.apiextensions.CustomResource(
-            f"{node_pool.name}-nodeclass",
+            f"{self._cluster_name}-{node_pool.name}-ncls",
             api_version="karpenter.k8s.aws/v1",
             kind="EC2NodeClass",
             metadata={"name": node_pool.name},
@@ -515,7 +515,7 @@ class KarpenterAddon(pulumi.ComponentResource):
             node_pool_spec["template"]["spec"]["taints"] = custom_taints
 
         node_pool_resource = k8s.apiextensions.CustomResource(
-            f"{node_pool.name}-nodepool",
+            f"{self._cluster_name}-{node_pool.name}-ncls",
             api_version="karpenter.sh/v1",
             kind="NodePool",
             metadata={"name": node_pool.name},
