@@ -187,8 +187,7 @@ We treat infrastructure code like software. The library includes tests you can r
 # Run Unit Tests (Fast, mocked AWS calls)
 uv run pytest -vv tests/unit
 
-# Run Integration Tests (Real provisioning against LocalStack)
-localstack start -d
+# Run Integration Tests (Real provisioning against LocalStack - no need to start LocalStack manually)
 uv run pytest -vv tests/integration
 ```
 
