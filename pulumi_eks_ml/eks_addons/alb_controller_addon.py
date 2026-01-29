@@ -3,6 +3,7 @@ import pulumi_aws as aws
 import pulumi_kubernetes as k8s
 
 from ..eks.cluster import EKSCluster
+from ..eks import config
 from ..eks.irsa import IRSA
 
 
@@ -15,6 +16,7 @@ def install_aws_load_balancer_controller(
     k8s_provider: k8s.Provider,
     dependencies: list[pulumi.Resource],
     parent: pulumi.Resource,
+    version: str,
 ) -> k8s.helm.v3.Release:
     """Install AWS Load Balancer Controller with IRSA."""
     release_name = "aws-load-balancer-controller"
@@ -254,7 +256,7 @@ def install_aws_load_balancer_controller(
         repository_opts=k8s.helm.v3.RepositoryOptsArgs(
             repo="https://aws.github.io/eks-charts",
         ),
-        version="1.7.2",
+        version=version,
         namespace="kube-system",
         values={
             "clusterName": cluster_name,
@@ -278,6 +280,7 @@ class AlbControllerAddon(pulumi.ComponentResource):
     """AWS Load Balancer Controller as a Pulumi ComponentResource."""
 
     helm_release: k8s.helm.v3.Release
+    version_key = "alb_controller"
 
     def __init__(
         self,
@@ -287,6 +290,7 @@ class AlbControllerAddon(pulumi.ComponentResource):
         oidc_provider_arn: pulumi.Input[str],
         oidc_issuer: pulumi.Input[str],
         opts: pulumi.ResourceOptions,
+        version: str = config.ALB_CONTROLLER_VERSION,
     ):
         super().__init__("pulumi-eks-ml:eks:AlbControllerAddon", name, None, opts)
 
@@ -299,6 +303,7 @@ class AlbControllerAddon(pulumi.ComponentResource):
             k8s_provider=opts.providers["kubernetes"],
             dependencies=opts.depends_on or [],
             parent=self,
+            version=version,
         )
 
         self.register_outputs({"helm_release": self.helm_release})
@@ -309,6 +314,7 @@ class AlbControllerAddon(pulumi.ComponentResource):
         cluster: EKSCluster,
         parent: pulumi.Resource | None = None,
         extra_dependencies: list[pulumi.Resource] | None = None,
+        version: str | None = None,
     ) -> "AlbControllerAddon":
         """Create an AlbControllerAddon from an EKSCluster instance."""
         return cls(
@@ -317,6 +323,7 @@ class AlbControllerAddon(pulumi.ComponentResource):
             oidc_provider_arn=cluster.k8s.oidc_provider_arn,
             oidc_issuer=cluster.k8s.oidc_issuer,
             vpc_id=cluster.vpc_id,
+            version=version or config.ALB_CONTROLLER_VERSION,
             opts=pulumi.ResourceOptions(
                 parent=parent,
                 depends_on=[

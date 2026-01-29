@@ -18,7 +18,7 @@ from .karpenter import KarpenterAddon
 class EKSCluster(pulumi.ComponentResource):
     """Creates an EKS cluster with basic configuration."""
 
-    region: str
+    region: pulumi.Output[str]
     cluster_name: pulumi.Output[str]
     cluster_endpoint: pulumi.Output[str]
     cluster_security_group_id: pulumi.Output[str]
@@ -35,17 +35,19 @@ class EKSCluster(pulumi.ComponentResource):
         subnet_ids: pulumi.Input[list[str]],
         node_pools: list[config.NodePoolConfig],
         region: str | None = None,
-        kubernetes_version: str = "1.35",
+        versions: config.ComponentVersions | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__("pulumi-eks-ml:aws:EKSCluster", name, None, opts)
+
+        self.versions = versions or config.ComponentVersions()
 
         # Store references
         self.subnet_ids = subnet_ids
         self.vpc_id = vpc_id
         self.name = name
         self.region = region or aws.get_region().region
-        self.k8s_name = f"{self.name}-k8s"
+        self.k8s_name = self.name
         self.node_pools = node_pools
 
         # Create internal AWS provider for this region
@@ -56,8 +58,9 @@ class EKSCluster(pulumi.ComponentResource):
         )
 
         # Create EKS cluster
-        self.k8s = self._create_eks_cluster(kubernetes_version)
+        self.k8s = self._create_eks_cluster()
         self.k8s_fargate_profile = self._create_fargate_profile()
+        # Bootstrap CoreDNS after Fargate profile is ready
         self.coredns_addon = self._create_coredns_addon()
 
         # Create Kubernetes provider
@@ -113,7 +116,7 @@ class EKSCluster(pulumi.ComponentResource):
             "Kubernetes provider not created yet. Make sure the underlying EKS cluster is created first."
         )
 
-    def _create_eks_cluster(self, kubernetes_version: str) -> eks.Cluster:
+    def _create_eks_cluster(self) -> eks.Cluster:
         """Create the EKS cluster."""
         return eks.Cluster(
             self.name,
@@ -122,11 +125,9 @@ class EKSCluster(pulumi.ComponentResource):
             vpc_id=self.vpc_id,
             subnet_ids=self.subnet_ids,
             # Cluster configuration
-            version=kubernetes_version,
+            version=self.versions.kubernetes,
             # Skip default node group - use Fargate + Karpenter
             skip_default_node_group=True,
-            # Bootstrap addons explicitly after Fargate profile is ready
-            bootstrap_self_managed_addons=False,
             # Enable cluster endpoint access
             endpoint_private_access=True,
             endpoint_public_access=True,
@@ -138,16 +139,27 @@ class EKSCluster(pulumi.ComponentResource):
             authentication_mode=eks.AuthenticationMode.API_AND_CONFIG_MAP,
             # Skip default security groups
             skip_default_security_groups=True,
-            # Enable VPC CNI
-            vpc_cni_options=eks.VpcCniOptionsArgs(),
-            # Enable kube-proxy addon
+            # Set 'bootstrap_self_managed_addons' to False to avoid bootstrapping CoreDNS
+            # We want to bootstrap CoreDNS ourselves AFTER the Fargate profile is ready
+            bootstrap_self_managed_addons=False,
             kube_proxy_addon_options=eks.KubeProxyAddonOptionsArgs(
                 enabled=True,
                 resolve_conflicts_on_create="OVERWRITE",
                 resolve_conflicts_on_update="OVERWRITE",
+                version=self.versions.kube_proxy,
             ),
-            opts=pulumi.ResourceOptions(parent=self, provider=self.get_provider("aws")),
+            vpc_cni_options=eks.VpcCniOptionsArgs(
+                addon_version=self.versions.vpc_cni,
+                resolve_conflicts_on_create="OVERWRITE",
+                resolve_conflicts_on_update="OVERWRITE",
+            ),
+            opts=pulumi.ResourceOptions(parent=self, provider=self.aws_provider),
         )
+
+    @property
+    def fargate_pod_execution_role(self) -> aws.iam.Role:
+        """The IAM role used for Fargate pod execution."""
+        return self._fargate_pod_execution_role
 
     def _create_fargate_profile(self) -> aws.eks.FargateProfile:
         """Create the Fargate profile with pod execution role."""
@@ -157,8 +169,8 @@ class EKSCluster(pulumi.ComponentResource):
         region = aws.get_region(opts=invoke_opts).region
 
         # Create a pod execution role for Fargate
-        pod_execution_role = aws.iam.Role(
-            f"{self.name}-fargate-pod-execution-role",
+        self._fargate_pod_execution_role = aws.iam.Role(
+            f"{self.name}-fgt-pod-role",
             assume_role_policy=pulumi.Output.json_dumps(
                 {
                     "Version": "2012-10-17",
@@ -189,24 +201,24 @@ class EKSCluster(pulumi.ComponentResource):
 
         # Attach the required managed policy for Fargate pod execution
         aws.iam.RolePolicyAttachment(
-            f"{self.name}-fargate-pod-execution-policy-attachment",
-            role=pod_execution_role.name,
+            f"{self.name}-fgt-pod-role-policy-attach",
+            role=self._fargate_pod_execution_role.name,
             policy_arn="arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy",
             opts=pulumi.ResourceOptions(
-                parent=pod_execution_role, provider=self.aws_provider
+                parent=self._fargate_pod_execution_role, provider=self.aws_provider
             ),
         )
 
         # Create Fargate profile with the pod execution role
         return aws.eks.FargateProfile(
-            f"{self.name}-fargate-profile",
+            f"{self.name}-fgt-profile",
             cluster_name=self.k8s_name,
-            pod_execution_role_arn=pod_execution_role.arn,
+            pod_execution_role_arn=self._fargate_pod_execution_role.arn,
             selectors=config.FARGATE_KARPENTER_COREDNS_SELECTORS,
             subnet_ids=self.subnet_ids,
             opts=pulumi.ResourceOptions(
                 parent=self,
-                depends_on=[pod_execution_role, self.k8s],
+                depends_on=[self._fargate_pod_execution_role, self.k8s],
                 provider=self.aws_provider,
             ),
         )
@@ -217,6 +229,7 @@ class EKSCluster(pulumi.ComponentResource):
         coredns_addon = aws.eks.Addon(
             f"{self.name}-coredns-addon",
             addon_name="coredns",
+            addon_version=self.versions.coredns,
             cluster_name=self.k8s_name,
             resolve_conflicts_on_create="OVERWRITE",
             resolve_conflicts_on_update="OVERWRITE",
@@ -227,18 +240,6 @@ class EKSCluster(pulumi.ComponentResource):
             ),
         )
         return coredns_addon
-
-    def _build_vpc_cni_configuration_values(self) -> dict:
-        return {
-            # This matches the CNI’s schema (same shape as your JSON)
-            "env": {
-                # Align with AWS defaults unless overridden by typed fields
-                "WARM_ENI_TARGET": "1",
-                "WARM_PREFIX_TARGET": "1",
-                "ENABLE_PREFIX_DELEGATION": "false",
-            },
-            "init": {"env": {"DISABLE_TCP_EARLY_DEMUX": "false"}},
-        }
 
     def _create_k8s_provider(self) -> k8s.Provider:
         """Create Kubernetes provider using the cluster's kubeconfig."""
@@ -428,12 +429,16 @@ class EKSCluster(pulumi.ComponentResource):
 class EKSClusterAddon(Protocol):
     """Protocol for EKS cluster addons."""
 
+    # Optional version key to look up in ComponentVersions
+    version_key: str | None
+
     @classmethod
     def from_cluster(
         cls,
         cluster: "EKSCluster",
         parent: pulumi.Resource | None = None,
         extra_dependencies: list[pulumi.Resource] | None = None,
+        version: str | None = None,
     ) -> "EKSClusterAddon":
         """Create an EKSClusterAddon from an EKSCluster instance."""
 
@@ -449,6 +454,7 @@ class EKSClusterAddonInstaller(pulumi.ComponentResource):
         name: str,
         cluster: EKSCluster,
         addon_types: list[type[EKSClusterAddon]],
+        versions: config.ComponentVersions | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__(
@@ -463,10 +469,19 @@ class EKSClusterAddonInstaller(pulumi.ComponentResource):
 
         for addon_type in addon_types:
             prev = self.addons and [self.addons[-1]] or None
+
+            # Determine version
+            version = None
+            if versions:
+                key = getattr(addon_type, "version_key", None)
+                if key and hasattr(versions, key):
+                    version = getattr(versions, key)
+
             addon = addon_type.from_cluster(
                 self.cluster,
                 parent=self,
                 extra_dependencies=prev,
+                version=version,
             )
             self.addons.append(addon)
 

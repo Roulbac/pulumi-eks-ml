@@ -3,6 +3,7 @@ import pulumi_aws as aws
 import pulumi_kubernetes as k8s
 
 from ..eks.cluster import EKSCluster
+from ..eks import config
 from ..eks.irsa import IRSA
 
 
@@ -14,6 +15,7 @@ def install_aws_for_fluent_bit(
     log_group_name: str,
     dependencies: list[pulumi.Resource],
     parent: pulumi.Resource,
+    version: str,
 ) -> k8s.helm.v3.Release:
     """Install AWS for Fluent Bit with IRSA for CloudWatch logging only."""
     release_name = "aws-for-fluent-bit"
@@ -67,7 +69,7 @@ def install_aws_for_fluent_bit(
         repository_opts=k8s.helm.v3.RepositoryOptsArgs(
             repo="https://aws.github.io/eks-charts",
         ),
-        version="0.1.35",
+        version=version,
         namespace="kube-system",
         values={
             "serviceAccount": {
@@ -132,6 +134,7 @@ class FluentBitAddon(pulumi.ComponentResource):
     """AWS for Fluent Bit as a Pulumi ComponentResource."""
 
     helm_release: k8s.helm.v3.Release
+    version_key = "fluent_bit"
 
     def __init__(
         self,
@@ -140,6 +143,7 @@ class FluentBitAddon(pulumi.ComponentResource):
         oidc_issuer: pulumi.Input[str],
         log_group_name: str,
         opts: pulumi.ResourceOptions,
+        version: str = config.FLUENT_BIT_VERSION,
     ):
         super().__init__("pulumi-eks-ml:eks:FluentBitAddon", name, None, opts)
 
@@ -151,6 +155,7 @@ class FluentBitAddon(pulumi.ComponentResource):
             log_group_name=log_group_name,
             dependencies=opts.depends_on or [],
             parent=self,
+            version=version,
         )
 
         self.register_outputs({"helm_release": self.helm_release})
@@ -162,6 +167,7 @@ class FluentBitAddon(pulumi.ComponentResource):
         parent: pulumi.Resource | None = None,
         log_group_prefix: str = "/eks/fluentbit/logs/",
         extra_dependencies: list[pulumi.Resource] | None = None,
+        version: str | None = None,
     ) -> "FluentBitAddon":
         """Create a FluentBitAddon from an EKSCluster instance."""
         log_group_prefix = log_group_prefix.rstrip("/")
@@ -171,6 +177,7 @@ class FluentBitAddon(pulumi.ComponentResource):
             oidc_provider_arn=cluster.k8s.oidc_provider_arn,
             oidc_issuer=cluster.k8s.oidc_issuer,
             log_group_name=log_group_name,
+            version=version or config.FLUENT_BIT_VERSION,
             opts=pulumi.ResourceOptions(
                 parent=parent,
                 depends_on=[

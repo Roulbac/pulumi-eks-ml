@@ -1,0 +1,20 @@
+name: multi-region
+description: A multi-region project with one VPC and one EKS cluster per region, peered in a full mesh topology.
+runtime:
+  name: python
+  options:
+    toolchain: uv
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: python
+  regions:
+    type: array
+    description: Regions to create VPCs and EKS clusters in.
+    items:
+      type: string
+  node_pools:
+    type: array
+    description: Karpenter node pool definitions - see 'NodePoolConfig' in 'pulumi_eks_ml' package.
+    items:
+      type: object

@@ -233,7 +233,7 @@ def create_karpenter_controller_policy(
             {
                 "Sid": "AllowInstanceProfileReadActions",
                 "Effect": "Allow",
-                "Action": ["iam:GetInstanceProfile"],
+                "Action": ["iam:GetInstanceProfile", "iam:ListInstanceProfiles"],
                 "Resource": [f"arn:aws:iam::{account_id}:instance-profile/*"],
             },
             {
@@ -257,6 +257,8 @@ class KarpenterAddon(pulumi.ComponentResource):
     karpenter_role: aws.iam.Role
     node_pools: dict[str, pulumi.Resource]
 
+    version_key = "karpenter"
+
     def __init__(
         self,
         name: str,
@@ -265,9 +267,9 @@ class KarpenterAddon(pulumi.ComponentResource):
         oidc_issuer: pulumi.Input[str],
         node_security_group_id: pulumi.Input[str],
         subnet_ids: pulumi.Input[list[str]],
+        opts: pulumi.ResourceOptions,
         node_pool_configs: list[config.NodePoolConfig] | None = None,
         karpenter_version: str = config.KARPENTER_VERSION,
-        opts: pulumi.ResourceOptions | None = None,
     ):
         super().__init__("pulumi-eks-ml:eks:KarpenterAddon", name, None, opts)
 
@@ -276,13 +278,17 @@ class KarpenterAddon(pulumi.ComponentResource):
         self._oidc_issuer = oidc_issuer
         self._node_security_group_id = node_security_group_id
         self._subnet_ids = subnet_ids
+
+        self._aws_provider = opts.providers["aws"]
+        self._k8s_provider = opts.providers["kubernetes"]
+
         self.node_pools = {}
 
         # Create namespace
         self.namespace = k8s.core.v1.Namespace(
             f"{name}-ns",
             metadata={"name": config.KARPENTER_NAMESPACE},
-            opts=pulumi.ResourceOptions(parent=self, retain_on_delete=True),
+            opts=pulumi.ResourceOptions(parent=self, retain_on_delete=True, provider=self._k8s_provider),
         )
 
         # IAM: controller IRSA and node role
@@ -323,11 +329,11 @@ class KarpenterAddon(pulumi.ComponentResource):
                     ],
                 }
             ),
-            opts=pulumi.ResourceOptions(parent=self),
+            opts=pulumi.ResourceOptions(parent=self, provider=self._aws_provider),
         )
 
         # Controller role via reusable IRSA component (attach controller policy inline)
-        invoke_opts = pulumi.InvokeOptions(provider=self.get_provider("aws"))
+        invoke_opts = pulumi.InvokeOptions(provider=self._aws_provider)
         controller_inline_policy = pulumi.Output.all(
             cluster_name=self._cluster_name,
             region=aws.get_region(opts=invoke_opts).region,
@@ -357,7 +363,7 @@ class KarpenterAddon(pulumi.ComponentResource):
                     policy=controller_inline_policy,
                 )
             ],
-            opts=pulumi.ResourceOptions(parent=self),
+            opts=pulumi.ResourceOptions(parent=self, provider=self._aws_provider),
         )
         self.karpenter_role = karpenter_irsa.iam_role
 
@@ -367,7 +373,7 @@ class KarpenterAddon(pulumi.ComponentResource):
                 f"{name}-node-policy-{policy_arn.split('/')[-1]}",
                 role=self.karpenter_node_role.name,
                 policy_arn=policy_arn,
-                opts=pulumi.ResourceOptions(parent=self),
+                opts=pulumi.ResourceOptions(parent=self, provider=self._aws_provider),
             )
 
         self.karpenter_node_access_entry = aws.eks.AccessEntry(
@@ -378,12 +384,14 @@ class KarpenterAddon(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(
                 parent=self,
                 depends_on=[self.karpenter_node_role],
+                provider=self._aws_provider,
             ),
         )
 
     def _install_karpenter_release(self, name: str, version: str) -> None:
         self.helm_release = k8s.helm.v3.Release(
-            f"{name}-release",
+            f"{name}",
+            name="karpenter",
             chart="oci://public.ecr.aws/karpenter/karpenter",
             version=version,
             namespace=config.KARPENTER_NAMESPACE,
@@ -410,12 +418,13 @@ class KarpenterAddon(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(
                 parent=self,
                 depends_on=[self.karpenter_role, self.namespace],
+                provider=self._k8s_provider,
             ),
         )
 
     def _add_node_pool(self, node_pool: config.NodePoolConfig) -> None:
         node_class_resource = k8s.apiextensions.CustomResource(
-            f"{node_pool.name}-nodeclass",
+            f"{self._cluster_name}-{node_pool.name}-ncls",
             api_version="karpenter.k8s.aws/v1",
             kind="EC2NodeClass",
             metadata={"name": node_pool.name},
@@ -440,6 +449,7 @@ class KarpenterAddon(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(
                 parent=self,
                 depends_on=[self.helm_release],
+                provider=self._k8s_provider,
             ),
         )
 
@@ -515,7 +525,7 @@ class KarpenterAddon(pulumi.ComponentResource):
             node_pool_spec["template"]["spec"]["taints"] = custom_taints
 
         node_pool_resource = k8s.apiextensions.CustomResource(
-            f"{node_pool.name}-nodepool",
+            f"{self._cluster_name}-{node_pool.name}-npl",
             api_version="karpenter.sh/v1",
             kind="NodePool",
             metadata={"name": node_pool.name},
@@ -523,6 +533,7 @@ class KarpenterAddon(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(
                 parent=self,
                 depends_on=[node_class_resource],
+                provider=self._k8s_provider,
             ),
         )
         self.node_pools[node_pool.name] = node_pool_resource
@@ -532,6 +543,7 @@ class KarpenterAddon(pulumi.ComponentResource):
         cls,
         cluster: EKSCluster,
         extra_dependencies: list[pulumi.Resource] | None = None,
+        version: str | None = None,
     ) -> "KarpenterAddon":
         """Create a KarpenterAddon from an EKSCluster instance."""
         return cls(
@@ -542,6 +554,7 @@ class KarpenterAddon(pulumi.ComponentResource):
             node_security_group_id=cluster.node_security_group.id,
             subnet_ids=cluster.subnet_ids,
             node_pool_configs=cluster.node_pools,
+            karpenter_version=version or config.KARPENTER_VERSION,
             opts=pulumi.ResourceOptions(
                 parent=cluster,
                 depends_on=[

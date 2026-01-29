@@ -38,6 +38,7 @@ def install_tailscale_subnet_router(
     # Install the Tailscale Kubernetes Operator via Helm
     operator_release = k8s.helm.v3.Release(
         f"{name}-tailscale-operator",
+        name="tailscale-operator",
         chart="tailscale-operator",
         repository_opts=k8s.helm.v3.RepositoryOptsArgs(
             repo="https://pkgs.tailscale.com/helmcharts",

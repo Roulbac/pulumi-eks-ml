@@ -78,7 +78,7 @@ class TestHubAndSpokeVPCPeering:
             opts=pulumi.ResourceOptions(provider=spoke_providers[1]),
         )
 
-        peering = vpc.HubAndSpokeVPCPeering(
+        peering = vpc.HubAndSpokePeeringStrategy(
             "hub-spoke",
             hub_vpc=hub_vpc,
             spoke_vpcs=[spoke_a, spoke_b],
@@ -143,30 +143,26 @@ class TestHubAndSpokeVPCPeering:
                     "Routes"
                 ]
                 peering_id = peering_ids[idx]
-                other_cidrs = [
-                    cidr
-                    for other_idx, cidr in enumerate(spoke_cidrs)
-                    if other_idx != idx
-                ]
-
+                
+                # Check Spoke -> Hub route
                 assert _has_peering_route(routes, hub_cidr, peering_id)
-                for other_cidr in other_cidrs:
-                    assert _has_peering_route(routes, other_cidr, peering_id)
 
 
-class TestMultiRegionHubAndSpokeVPCs:
+
+class TestVPCPeeredGroup:
     HUB_REGION = "us-east-1"
     SPOKE_REGIONS = ["us-west-2"]
 
     @staticmethod
     def _multi_region_program() -> None:
-        hub_region = TestMultiRegionHubAndSpokeVPCs.HUB_REGION
-        spoke_regions = TestMultiRegionHubAndSpokeVPCs.SPOKE_REGIONS
+        hub_region = TestVPCPeeredGroup.HUB_REGION
+        spoke_regions = TestVPCPeeredGroup.SPOKE_REGIONS
 
-        multi_region = vpc.MultiRegionHubAndSpokeVPCs(
+        multi_region = vpc.VPCPeeredGroup(
             "multi-region",
-            hub_region=hub_region,
-            spoke_regions=spoke_regions,
+            regions=[hub_region, *spoke_regions],
+            topology="hub_and_spoke",
+            hub=hub_region,
         )
 
         pulumi.export("hub_vpc_id", multi_region.vpcs[hub_region].vpc_id)
@@ -198,14 +194,14 @@ class TestMultiRegionHubAndSpokeVPCs:
         )
         pulumi.export(
             "peering_connection_ids",
-            multi_region.hub_and_spoke.peering_connection_ids,
+            multi_region.peering_connection_ids,
         )
 
     @staticmethod
     def test_creates_hub_and_spoke_across_regions(ec2_client, localstack_endpoint):
         with pulumi_stack_factory() as create_stack:
             stack: auto.Stack = create_stack(
-                program=TestMultiRegionHubAndSpokeVPCs._multi_region_program
+                program=TestVPCPeeredGroup._multi_region_program
             )
             result = stack.up(on_output=None)
 
@@ -222,30 +218,30 @@ class TestMultiRegionHubAndSpokeVPCs:
             ].value[0]
             spoke_cidr = result.outputs["spoke_cidrs"].value[0]
 
-            spoke_region = TestMultiRegionHubAndSpokeVPCs.SPOKE_REGIONS[0]
-            spoke_client = boto3.client(
-                "ec2",
-                endpoint_url=localstack_endpoint,
-                region_name=spoke_region,
-            )
+            for spoke_region in TestVPCPeeredGroup.SPOKE_REGIONS:
+                spoke_client = boto3.client(
+                    "ec2",
+                    endpoint_url=localstack_endpoint,
+                    region_name=spoke_region,
+                )
 
-            assert ec2_client.describe_vpcs(VpcIds=[hub_vpc_id])["Vpcs"]
-            assert spoke_client.describe_vpcs(VpcIds=[spoke_vpc_id])["Vpcs"]
+                assert ec2_client.describe_vpcs(VpcIds=[hub_vpc_id])["Vpcs"]
+                assert spoke_client.describe_vpcs(VpcIds=[spoke_vpc_id])["Vpcs"]
 
-            peering_ids = [
-                pc["VpcPeeringConnectionId"]
-                for pc in ec2_client.describe_vpc_peering_connections()[
-                    "VpcPeeringConnections"
+                peering_ids = [
+                    pc["VpcPeeringConnectionId"]
+                    for pc in ec2_client.describe_vpc_peering_connections()[
+                        "VpcPeeringConnections"
+                    ]
                 ]
-            ]
-            assert peering_id in peering_ids
+                assert peering_id in peering_ids
 
-            hub_routes = _get_route_table(ec2_client, hub_private_route_table_id)[
-                "Routes"
-            ]
-            assert _has_peering_route(hub_routes, spoke_cidr, peering_id)
+                hub_routes = _get_route_table(ec2_client, hub_private_route_table_id)[
+                    "Routes"
+                ]
+                assert _has_peering_route(hub_routes, spoke_cidr, peering_id)
 
-            spoke_routes = _get_route_table(spoke_client, spoke_private_route_table_id)[
-                "Routes"
-            ]
-            assert _has_peering_route(spoke_routes, hub_cidr, peering_id)
+                spoke_routes = _get_route_table(spoke_client, spoke_private_route_table_id)[
+                    "Routes"
+                ]
+                assert _has_peering_route(spoke_routes, hub_cidr, peering_id)

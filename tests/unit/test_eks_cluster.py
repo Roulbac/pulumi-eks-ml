@@ -121,6 +121,7 @@ def _make_recording_addon(
             cluster,
             parent=None,
             extra_dependencies=None,
+            version=None,
         ):
             return cls(
                 f"{cluster.name}-{name}",
@@ -276,27 +277,28 @@ def test_security_group_rules() -> pulumi.Output[None]:
 def test_fargate_pod_execution_role_trust_policy() -> pulumi.Output[None]:
     cluster = _create_cluster()
 
-    def check(_: str) -> None:
+    def check(_) -> None:
+        
         role_args = next(
             args
             for args in mocks.resources
             if args.typ == "aws:iam/role:Role"
-            and args.name.endswith("fargate-pod-execution-role")
+            and args.name == f"{cluster.name}-fgt-pod-role"
         )
+
         policy_document = role_args.inputs.get(
             "assume_role_policy", role_args.inputs.get("assumeRolePolicy")
         )
         policy = _parse_policy_document(policy_document)
         source_arn = policy["Statement"][0]["Condition"]["ArnLike"]["aws:SourceArn"]
+        
+        # In mocks, cluster.k8s_name is "test" (from _create_cluster)
         expected = (
-            f"arn:aws:eks:{_REGION}:{_ACCOUNT_ID}:fargateprofile/{cluster.k8s_name}/*"
+            f"arn:aws:eks:{_REGION}:{_ACCOUNT_ID}:fargateprofile/test/*"
         )
         assert source_arn == expected
 
-    return pulumi.Output.all(
-        cluster.cluster_name,
-        cluster.k8s_fargate_profile.id,
-    ).apply(lambda values: check(values[0]))
+    return cluster.fargate_pod_execution_role.arn.apply(check)
 
 
 @pulumi.runtime.test

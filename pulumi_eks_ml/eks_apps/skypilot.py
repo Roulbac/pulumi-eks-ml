@@ -38,7 +38,7 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
 
     - Enforces ALB ingress (internal) with health checks
     - Generates initial Basic Auth credentials and enables user management
-    - Exposes `release` and `password` outputs
+    - Exposes `admin_username` and `admin_password` outputs
     """
 
     admin_username: pulumi.Output[str]
@@ -118,6 +118,7 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
         # Install the Helm release
         self.release = k8s.helm.v3.Release(
             f"{release_name}-release",
+            name="skypilot",
             chart="skypilot",
             repository_opts=k8s.helm.v3.RepositoryOptsArgs(
                 repo="https://helm.skypilot.co"

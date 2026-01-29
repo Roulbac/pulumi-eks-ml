@@ -1,6 +1,5 @@
 config:
-  # Required by the AWS provider to know where to create resources.
-  aws:region: us-west-2
+  regions: ["us-east-1", "us-east-2", "us-west-2"]
   node_pools:
     - capacity_type: on-demand
       instance_type: t3.large

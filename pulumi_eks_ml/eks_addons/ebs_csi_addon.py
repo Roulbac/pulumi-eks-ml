@@ -3,6 +3,7 @@ import pulumi_aws as aws
 import pulumi_kubernetes as k8s
 
 from ..eks.cluster import EKSCluster
+from ..eks import config
 from ..eks.irsa import IRSA
 
 
@@ -13,6 +14,7 @@ def install_ebs_csi_driver(
     k8s_provider: k8s.Provider,
     dependencies: list[pulumi.Resource],
     parent: pulumi.Resource,
+    version: str,
 ) -> k8s.helm.v3.Release:
     """Install AWS EBS CSI driver with IRSA."""
 
@@ -61,11 +63,12 @@ def install_ebs_csi_driver(
 
     return k8s.helm.v3.Release(
         f"{name}-ebs-csi",
+        name="ebs-csi",
         chart="aws-ebs-csi-driver",
         repository_opts=k8s.helm.v3.RepositoryOptsArgs(
             repo="https://kubernetes-sigs.github.io/aws-ebs-csi-driver",
         ),
-        version="2.29.1",
+        version=version,
         namespace="kube-system",
         values={
             "controller": {
@@ -121,6 +124,7 @@ class EbsCsiAddon(pulumi.ComponentResource):
 
     helm_release: k8s.helm.v3.Release
     storage_class: k8s.storage.v1.StorageClass
+    version_key = "ebs_csi"
 
     def __init__(
         self,
@@ -128,6 +132,7 @@ class EbsCsiAddon(pulumi.ComponentResource):
         oidc_provider_arn: pulumi.Input[str],
         oidc_issuer: pulumi.Input[str],
         opts: pulumi.ResourceOptions,
+        version: str = config.EBS_CSI_VERSION,
     ):
         super().__init__("pulumi-eks-ml:eks:EbsCsiAddon", name, None, opts)
 
@@ -138,6 +143,7 @@ class EbsCsiAddon(pulumi.ComponentResource):
             k8s_provider=opts.providers["kubernetes"],
             dependencies=opts.depends_on or [],
             parent=self,
+            version=version,
         )
 
         self.storage_class = create_default_gp3_storageclass(
@@ -160,12 +166,14 @@ class EbsCsiAddon(pulumi.ComponentResource):
         cluster: EKSCluster,
         parent: pulumi.Resource | None = None,
         extra_dependencies: list[pulumi.Resource] | None = None,
+        version: str | None = None,
     ) -> "EbsCsiAddon":
         """Create an EbsCsiAddon from an EKSCluster instance."""
         return cls(
             name=f"{cluster.name}-ebs-csi",
             oidc_provider_arn=cluster.k8s.oidc_provider_arn,
             oidc_issuer=cluster.k8s.oidc_issuer,
+            version=version or config.EBS_CSI_VERSION,
             opts=pulumi.ResourceOptions(
                 parent=parent,
                 depends_on=[

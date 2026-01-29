@@ -10,6 +10,7 @@ def create_nvidia_device_plugin(
     k8s_provider: k8s.Provider,
     parent: pulumi.Resource,
     depends_on: list[pulumi.Resource],
+    version: str,
     custom_tolerations: list[dict] | None = None,
 ) -> k8s.helm.v3.Release:
     """Create NVIDIA device plugin Helm release."""
@@ -32,7 +33,7 @@ def create_nvidia_device_plugin(
         repository_opts=k8s.helm.v3.RepositoryOptsArgs(
             repo="https://nvidia.github.io/k8s-device-plugin",
         ),
-        version="0.17.3",
+        version=version,
         namespace="kube-system",
         values={
             "devicePlugin": {"enabled": True},
@@ -66,12 +67,14 @@ class NvidiaDevicePluginAddon(pulumi.ComponentResource):
     """NVIDIA device plugin as a Pulumi ComponentResource."""
 
     helm_release: k8s.helm.v3.Release
+    version_key = "nvidia_device_plugin"
 
     def __init__(
         self,
         name: str,
         opts: pulumi.ResourceOptions,
         custom_tolerations: list[dict] | None = None,
+        version: str = config.NVIDIA_DEVICE_PLUGIN_VERSION,
     ):
         super().__init__("pulumi-eks-ml:eks:NvidiaDevicePluginAddon", name, None, opts)
 
@@ -81,6 +84,7 @@ class NvidiaDevicePluginAddon(pulumi.ComponentResource):
             parent=self,
             depends_on=opts.depends_on or [],
             custom_tolerations=custom_tolerations,
+            version=version,
         )
 
         self.register_outputs({"helm_release": self.helm_release})
@@ -91,12 +95,14 @@ class NvidiaDevicePluginAddon(pulumi.ComponentResource):
         cluster: EKSCluster,
         parent: pulumi.Resource | None = None,
         extra_dependencies: list[pulumi.Resource] | None = None,
+        version: str | None = None,
     ) -> "NvidiaDevicePluginAddon":
         """Create a NvidiaDevicePluginAddon from an EKSCluster instance."""
         custom_tolerations = _collect_custom_tolerations(cluster.node_pools or [])
         return cls(
             name=f"{cluster.name}-nvidia-device-plugin",
             custom_tolerations=custom_tolerations,
+            version=version or config.NVIDIA_DEVICE_PLUGIN_VERSION,
             opts=pulumi.ResourceOptions(
                 parent=parent,
                 depends_on=[

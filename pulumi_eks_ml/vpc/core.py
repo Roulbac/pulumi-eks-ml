@@ -31,11 +31,10 @@ class VPC(pulumi.ComponentResource):
     ):
         super().__init__("pulumi-eks-ml:aws:VPC", name, None, opts)
 
-        self.region = aws.get_region(
-            opts=pulumi.InvokeOptions(provider=opts.provider)
-        ).region
+        provider = opts and opts.provider or None
+        self.region = aws.get_region(opts=pulumi.InvokeOptions(provider=provider)).region
         self.azs = aws.get_availability_zones(
-            opts=pulumi.InvokeOptions(provider=opts.provider)
+            opts=pulumi.InvokeOptions(provider=provider)
         )
 
         # Calculate subnet CIDRs automatically

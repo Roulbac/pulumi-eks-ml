@@ -4,13 +4,22 @@ import typing
 from dataclasses import dataclass
 
 
+
 # Karpenter constants
 KARPENTER_NAMESPACE = "karpenter"
 KARPENTER_SA_NAME = "karpenter"
-KARPENTER_VERSION = "1.6.3"
+KARPENTER_VERSION = "1.8.6"
+
+# Addon versions
+ALB_CONTROLLER_VERSION = "1.11.0"
+FLUENT_BIT_VERSION = "0.1.35"
+EBS_CSI_VERSION = "2.54.1"
+METRICS_SERVER_VERSION = "3.13.0"
+NVIDIA_DEVICE_PLUGIN_VERSION = "0.18.2"
+EFS_CSI_VERSION = "3.3.0"
 
 # EKS constants
-DEFAULT_KUBERNETES_VERSION = "1.33"
+DEFAULT_KUBERNETES_VERSION = "1.35"
 DEFAULT_EBS_SIZE = "128Gi"
 DEFAULT_VCPU_LIMIT = "100"
 DEFAULT_MEMORY_LIMIT = "100Gi"
@@ -115,3 +124,20 @@ class NodePoolConfig:
             taints=taints,
             labels=data.get("labels"),
         )
+
+
+@dataclass
+class ComponentVersions:
+    """Configuration for component versions."""
+
+    kubernetes: str = DEFAULT_KUBERNETES_VERSION
+    karpenter: str = KARPENTER_VERSION
+    alb_controller: str = ALB_CONTROLLER_VERSION
+    fluent_bit: str = FLUENT_BIT_VERSION
+    ebs_csi: str = EBS_CSI_VERSION
+    metrics_server: str = METRICS_SERVER_VERSION
+    nvidia_device_plugin: str = NVIDIA_DEVICE_PLUGIN_VERSION
+    efs_csi: str = EFS_CSI_VERSION
+    coredns: str | None = None
+    kube_proxy: str | None = None
+    vpc_cni: str | None = None

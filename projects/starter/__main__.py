@@ -12,19 +12,16 @@ node_pools_config = cfg.require_object("node_pools")
 
 node_pools = [eks.NodePoolConfig.from_dict(pool) for pool in node_pools_config]
 
-single_region_networking = vpc.MultiRegionHubAndSpokeVPCs(
-    name=f"{deployment_name}-vpcs",
-    hub_region=main_region,
-    spoke_regions=[],
+vpc_resource = vpc.VPC(
+    name=f"{deployment_name}-vpc",
+    cidr_block="10.0.0.0/16",
+    setup_internet_egress=True,
 )
-
-hub_vpc = single_region_networking.vpcs[main_region]
-hub_aws_provider = single_region_networking.providers[main_region]
 
 cluster = eks.EKSCluster(
     f"{deployment_name}-cls",
-    vpc_id=hub_vpc.vpc_id,
-    subnet_ids=hub_vpc.private_subnet_ids,
+    vpc_id=vpc_resource.vpc_id,
+    subnet_ids=vpc_resource.private_subnet_ids,
     node_pools=node_pools,
 )
 
@@ -35,5 +32,5 @@ addon_installations = eks.cluster.EKSClusterAddonInstaller(
 )
 
 
-pulumi.export("vpc_id", hub_vpc.vpc_id)
+pulumi.export("vpc_id", vpc_resource.vpc_id)
 pulumi.export("cluster_name", cluster.cluster_name)
