@@ -6,35 +6,19 @@
 
 This repository provides a modular set of Pulumi components (`pulumi_eks_ml`) to spin up multi-tenant, multi-region ML infrastructure with minimal pain.
 
+
 ## 💡 Philosophy
 
 This project treats infrastructure as a **composable library**. Instead of one giant deployment, you get modular building blocks (VPC, EKS, GPU Node Pools) that you can assemble into your own topology.
 
 Whether it's a single cluster for testing or a global mesh for distributed workloads, you can define your architecture once in Python, then deploy identical copies across different environments thanks to Pulumi stacks.
 
-## 🚀 Key Features
-
--   **ML-Optimized Compute**: Pre-configured EKS clusters with **Karpenter** for autoscaling (Spot/On-Demand) and NVIDIA GPU drivers ready to go.
--   **Global Networking**: Easy **Multi-Region** connectivity with Hub-and-Spoke or Full Mesh VPC peering topologies.
--   **Opinionated Add-ons for ML**: Built-in support for ALB Controller, EBS/EFS CSI drivers, FluentBit, Metrics Server, etc...
--  **Secure network with Tailscale**: Secure network with Tailscale for VPN access, in additional to public/private subnet isolation.
--   **SkyPilot Multi-Tenant Platform**: Opinionated deployment of [SkyPilot](https://skypilot.readthedocs.io/) for multi-tenant, multi-region AI workloads.
-
-## 📂 Repository Structure
-
--   `pulumi_eks_ml/`: The core Python library containing reusable infrastructure components.
--   `projects/`: Reference implementations and live infrastructure code.
-    -   `starter/`: A simple single-region EKS cluster.
-    -   `multi-region/`: A full-mesh global network connecting clusters across regions.
-    -   `skypilot-multi-tenant/`: A SkyPilot platform with isolated data planes for multiple teams.
-
-## 🛠 Getting Started
-
 ## ⚡ Quickstart
 
 Use the starter project as the fastest path to a working EKS cluster.
 
 ```python
+# __main__.py
 import pulumi
 
 from pulumi_eks_ml import eks, eks_addons, vpc
@@ -76,6 +60,24 @@ pulumi stack init dev
 pulumi config set aws:region us-west-2
 uv run pulumi up
 ```
+
+## 🚀 Key Features
+
+-   **ML-Optimized Compute**: Pre-configured EKS clusters with **Karpenter** for autoscaling (Spot/On-Demand) and NVIDIA GPU drivers ready to go.
+-   **Global Networking**: Easy **Multi-Region** connectivity with Hub-and-Spoke or Full Mesh VPC peering topologies.
+-   **Opinionated Add-ons for ML**: Built-in support for ALB Controller, EBS/EFS CSI drivers, FluentBit, Metrics Server, etc...
+-  **Secure network with Tailscale**: Secure network with Tailscale for VPN access, in additional to public/private subnet isolation.
+-   **SkyPilot Multi-Tenant Platform**: Opinionated deployment of [SkyPilot](https://skypilot.readthedocs.io/) for multi-tenant, multi-region AI workloads.
+
+## 📂 Repository Structure
+
+-   `pulumi_eks_ml/`: The core Python library containing reusable infrastructure components.
+-   `projects/`: Reference implementations and live infrastructure code.
+    -   `starter/`: A simple single-region EKS cluster.
+    -   `multi-region/`: A full-mesh global network connecting clusters across regions.
+    -   `skypilot-multi-tenant/`: A SkyPilot platform with isolated data planes for multiple teams.
+
+## 🛠 Getting Started
 
 ### Prerequisites
 
