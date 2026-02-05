@@ -2,7 +2,7 @@ import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as k8s
 
-from ..eks.cluster import EKSCluster
+from ..eks.cluster import EKSCluster, EKSClusterAddon
 from ..eks import config
 from ..eks.irsa import IRSA
 
@@ -14,6 +14,7 @@ def install_aws_load_balancer_controller(
     oidc_issuer: pulumi.Input[str],
     vpc_id: pulumi.Input[str],
     k8s_provider: k8s.Provider,
+    aws_provider: aws.Provider,
     dependencies: list[pulumi.Resource],
     parent: pulumi.Resource,
     version: str,
@@ -21,8 +22,14 @@ def install_aws_load_balancer_controller(
     """Install AWS Load Balancer Controller with IRSA."""
     release_name = "aws-load-balancer-controller"
 
+    opts = pulumi.ResourceOptions(
+        parent=parent,
+        providers={"kubernetes": k8s_provider, "aws": aws_provider},
+        depends_on=[*dependencies],
+    )
+
     # Create inline policy for ALB controller
-    # Taken from https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.13.4/docs/install/iam_policy.json
+    # Taken from https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.17.1/docs/install/iam_policy.json
     alb_policy = pulumi.Output.json_dumps(
         {
             "Version": "2012-10-17",
@@ -203,10 +210,31 @@ def install_aws_load_balancer_controller(
                         "elasticloadbalancing:ModifyTargetGroup",
                         "elasticloadbalancing:ModifyTargetGroupAttributes",
                         "elasticloadbalancing:DeleteTargetGroup",
+                        "elasticloadbalancing:ModifyListenerAttributes",
+                        "elasticloadbalancing:ModifyCapacityReservation",
+                        "elasticloadbalancing:ModifyIpPools",
                     ],
                     "Resource": "*",
                     "Condition": {
                         "Null": {"aws:ResourceTag/elbv2.k8s.aws/cluster": "false"}
+                    },
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": ["elasticloadbalancing:AddTags"],
+                    "Resource": [
+                        "arn:aws:elasticloadbalancing:*:*:targetgroup/*/*",
+                        "arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*",
+                        "arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*",
+                    ],
+                    "Condition": {
+                        "StringEquals": {
+                            "elasticloadbalancing:CreateAction": [
+                                "CreateTargetGroup",
+                                "CreateLoadBalancer",
+                            ]
+                        },
+                        "Null": {"aws:RequestTag/elbv2.k8s.aws/cluster": "false"},
                     },
                 },
                 {
@@ -225,6 +253,7 @@ def install_aws_load_balancer_controller(
                         "elasticloadbalancing:AddListenerCertificates",
                         "elasticloadbalancing:RemoveListenerCertificates",
                         "elasticloadbalancing:ModifyRule",
+                        "elasticloadbalancing:SetRulePriorities",
                     ],
                     "Resource": "*",
                 },
@@ -246,7 +275,7 @@ def install_aws_load_balancer_controller(
                 policy=alb_policy,
             )
         ],
-        opts=pulumi.ResourceOptions(parent=parent),
+        opts=opts,
     )
 
     return k8s.helm.v3.Release(
@@ -260,7 +289,7 @@ def install_aws_load_balancer_controller(
         namespace="kube-system",
         values={
             "clusterName": cluster_name,
-            "region": aws.get_region().region,
+            "region": aws_provider.region,
             "vpcId": vpc_id,
             "serviceAccount": {
                 "name": "aws-load-balancer-controller",
@@ -276,7 +305,7 @@ def install_aws_load_balancer_controller(
     )
 
 
-class AlbControllerAddon(pulumi.ComponentResource):
+class AlbControllerAddon(pulumi.ComponentResource, EKSClusterAddon):
     """AWS Load Balancer Controller as a Pulumi ComponentResource."""
 
     helm_release: k8s.helm.v3.Release
@@ -301,6 +330,7 @@ class AlbControllerAddon(pulumi.ComponentResource):
             oidc_issuer=oidc_issuer,
             vpc_id=vpc_id,
             k8s_provider=opts.providers["kubernetes"],
+            aws_provider=opts.providers["aws"],
             dependencies=opts.depends_on or [],
             parent=self,
             version=version,

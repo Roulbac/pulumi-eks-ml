@@ -10,6 +10,6 @@ config:
       pulumi:template: python
   node_pools:
     type: array
-    description: Karpenter node pool definitions (array of objects with instance_type).
+    description: Karpenter node pool definitions (instance_type list, optional instance_family/instance_category lists).
     items:
       type: object

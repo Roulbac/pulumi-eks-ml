@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import MagicMock, patch
 
 import pulumi
 import pulumi_aws as aws
@@ -36,19 +37,6 @@ class EKSClusterMocks(pulumi.runtime.Mocks):
         self.resources.append(args)
         resource_type = args.typ
         outputs = dict(args.inputs)
-
-        if resource_type == "eks:index:Cluster":
-            outputs.update(
-                {
-                    "cluster_security_group_id": "sg-cluster",
-                    "node_security_group_id": "sg-nodes",
-                    "kubeconfig_json": json.dumps(_MINIMAL_KUBECONFIG),
-                    "oidc_provider_arn": _OIDC_PROVIDER_ARN,
-                    "oidc_issuer": _OIDC_ISSUER,
-                    "fargate_profile_id": "fp-123456",
-                }
-            )
-            return "ekscluster-id", outputs
 
         if resource_type == "aws:ec2/securityGroup:SecurityGroup":
             security_group_id = outputs.get("id") or f"sg-{args.name}"
@@ -104,10 +92,37 @@ def _reset_mocks() -> None:
     mocks.reset()
 
 
+@pytest.fixture
+def mock_eks_cluster_cls():
+    with patch("pulumi_eks.Cluster") as MockCluster:
+        # Ensure the mock instance passes isinstance(obj, Resource) checks
+        mock_instance = MagicMock(spec=pulumi.ComponentResource)
+        # Mock attributes required by Pulumi runtime internals
+        mock_instance._remote = False
+        mock_instance._providers = {}
+        mock_instance._childResources = set()
+        
+        MockCluster.return_value = mock_instance
+        
+        mock_instance.cluster_security_group_id = pulumi.Output.from_input("sg-cluster")
+        mock_instance.kubeconfig_json = pulumi.Output.from_input(json.dumps(_MINIMAL_KUBECONFIG))
+        mock_instance.oidc_provider_arn = pulumi.Output.from_input(_OIDC_PROVIDER_ARN)
+        mock_instance.oidc_issuer = pulumi.Output.from_input(_OIDC_ISSUER)
+        mock_instance.fargate_profile_id = pulumi.Output.from_input("fp-123456")
+        
+        mock_aws_cluster = MagicMock()
+        mock_aws_cluster.arn = f"arn:aws:eks:{_REGION}:{_ACCOUNT_ID}:cluster/test"
+        mock_instance.eks_cluster = pulumi.Output.from_input(mock_aws_cluster)
+        
+        yield MockCluster
+
+
 def _make_recording_addon(
     name: str, events: list[str]
 ) -> type[pulumi.ComponentResource]:
     class _RecordingAddon(pulumi.ComponentResource):
+        version_key = "kubernetes"
+
         def __init__(self, resource_name: str, opts: pulumi.ResourceOptions) -> None:
             super().__init__(
                 "pulumi-eks-ml:test:RecordingAddon", resource_name, None, opts
@@ -189,7 +204,7 @@ def _rule_matches(rule: dict, **criteria: object) -> bool:
 
 
 @pulumi.runtime.test
-def test_security_group_rules() -> pulumi.Output[None]:
+def test_security_group_rules(mock_eks_cluster_cls) -> pulumi.Output[None]:
     cluster = _create_cluster()
     rule_outputs = pulumi.Output.all(
         pulumi.Output.all(*[_rule_snapshot(rule) for rule in cluster.extra_sg_rules]),
@@ -199,7 +214,7 @@ def test_security_group_rules() -> pulumi.Output[None]:
 
     def check(values: list[object]) -> None:
         rules, node_sg_id, cluster_sg_id = values
-        expected_count = 5 + len(config.CLUSTER_FROM_NODE_SG_RULES)
+        expected_count = 6 + len(config.CLUSTER_FROM_NODE_SG_RULES)
         assert len(rules) == expected_count
 
         assert _rule_matches(
@@ -274,7 +289,7 @@ def test_security_group_rules() -> pulumi.Output[None]:
 
 
 @pulumi.runtime.test
-def test_fargate_pod_execution_role_trust_policy() -> pulumi.Output[None]:
+def test_fargate_pod_execution_role_trust_policy(mock_eks_cluster_cls) -> pulumi.Output[None]:
     cluster = _create_cluster()
 
     def check(_) -> None:
@@ -302,7 +317,7 @@ def test_fargate_pod_execution_role_trust_policy() -> pulumi.Output[None]:
 
 
 @pulumi.runtime.test
-def test_addon_bootstrap_order() -> pulumi.Output[None]:
+def test_addon_bootstrap_order(mock_eks_cluster_cls) -> pulumi.Output[None]:
     events: list[str] = []
     _create_cluster(
         addon_types=[

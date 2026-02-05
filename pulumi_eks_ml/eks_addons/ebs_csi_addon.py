@@ -2,7 +2,7 @@ import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as k8s
 
-from ..eks.cluster import EKSCluster
+from ..eks.cluster import EKSCluster, EKSClusterAddon
 from ..eks import config
 from ..eks.irsa import IRSA
 
@@ -119,7 +119,7 @@ def create_default_gp3_storageclass(
     )
 
 
-class EbsCsiAddon(pulumi.ComponentResource):
+class EbsCsiAddon(pulumi.ComponentResource, EKSClusterAddon):
     """AWS EBS CSI driver and gp3 StorageClass as a Pulumi ComponentResource."""
 
     helm_release: k8s.helm.v3.Release

@@ -1,12 +1,13 @@
 [project]
-name = "multi-region"
+name = "skypilot-multi-tenant"
 version = "0.1.0"
-description = "A project for deploying a multi-region EKS architecture, with a single VPC and one EKS cluster per region, peered in a full mesh topology."
+description = "A project for deploying a multi-tenant Skypilot platform, using multiple namespaces and multi-region EKS clusters."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "pulumi>=3.192.0",
     "pulumi-eks-ml",
+    "pydantic>=2.0.0",
 ]
 
 [tool.uv.sources]

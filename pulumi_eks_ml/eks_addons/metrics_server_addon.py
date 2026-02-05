@@ -2,7 +2,7 @@ import pulumi
 import pulumi_kubernetes as k8s
 
 from ..eks import config
-from ..eks.cluster import EKSCluster
+from ..eks.cluster import EKSCluster, EKSClusterAddon
 
 
 def create_metrics_server(
@@ -31,7 +31,7 @@ def create_metrics_server(
     )
 
 
-class MetricsServerAddon(pulumi.ComponentResource):
+class MetricsServerAddon(pulumi.ComponentResource, EKSClusterAddon):
     """Kubernetes Metrics Server as a Pulumi ComponentResource."""
 
     helm_release: k8s.helm.v3.Release

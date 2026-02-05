@@ -2,7 +2,7 @@ import pulumi
 import pulumi_kubernetes as k8s
 
 from ..eks import config
-from ..eks.cluster import EKSCluster
+from ..eks.cluster import EKSCluster, EKSClusterAddon
 
 
 def create_nvidia_device_plugin(
@@ -63,7 +63,7 @@ def _collect_custom_tolerations(
     return custom_tolerations
 
 
-class NvidiaDevicePluginAddon(pulumi.ComponentResource):
+class NvidiaDevicePluginAddon(pulumi.ComponentResource, EKSClusterAddon):
     """NVIDIA device plugin as a Pulumi ComponentResource."""
 
     helm_release: k8s.helm.v3.Release

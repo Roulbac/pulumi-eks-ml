@@ -2,7 +2,7 @@ import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as k8s
 
-from ..eks.cluster import EKSCluster
+from ..eks.cluster import EKSCluster, EKSClusterAddon
 from ..eks import config
 from ..eks.irsa import IRSA
 
@@ -130,7 +130,7 @@ def install_aws_for_fluent_bit(
     )
 
 
-class FluentBitAddon(pulumi.ComponentResource):
+class FluentBitAddon(pulumi.ComponentResource, EKSClusterAddon):
     """AWS for Fluent Bit as a Pulumi ComponentResource."""
 
     helm_release: k8s.helm.v3.Release

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from abc import ABC, abstractmethod
 from textwrap import dedent
-from typing import Protocol
+from typing import ClassVar
 
 import pulumi
 import pulumi_aws as aws
@@ -21,6 +22,7 @@ class EKSCluster(pulumi.ComponentResource):
     region: pulumi.Output[str]
     cluster_name: pulumi.Output[str]
     cluster_endpoint: pulumi.Output[str]
+    cluster_arn: pulumi.Output[str]
     cluster_security_group_id: pulumi.Output[str]
     node_security_group_id: pulumi.Output[str]
     kubeconfig: pulumi.Output[str]
@@ -84,17 +86,19 @@ class EKSCluster(pulumi.ComponentResource):
         )
 
         self.cluster_security_group_id = self.k8s.cluster_security_group_id
-        self.node_security_group_id = self.k8s.node_security_group_id
+        self.node_security_group_id = self.node_security_group.id
         self.kubeconfig = self.k8s.kubeconfig_json
         self.oidc_provider_arn = self.k8s.oidc_provider_arn
         self.oidc_issuer = self.k8s.oidc_issuer
         self.fargate_profile_id = self.k8s.fargate_profile_id
+        self.cluster_arn = self.k8s.eks_cluster.apply(lambda cluster: cluster.arn)
 
         self.register_outputs(
             {
                 "region": self.region,
                 "cluster_name": self.cluster_name,
                 "cluster_endpoint": self.cluster_endpoint,
+                "cluster_arn": self.cluster_arn,
                 "cluster_security_group_id": self.k8s.cluster_security_group_id,
                 "node_security_group_id": self.node_security_group_id,
                 "kubeconfig": self.kubeconfig,
@@ -282,6 +286,21 @@ class EKSCluster(pulumi.ComponentResource):
                 ),
             ),
             aws.ec2.SecurityGroupRule(
+                f"{self.name}-nodesg-allow-nfs-internal",
+                type="ingress",
+                security_group_id=node_security_group.id,
+                from_port=2049,
+                to_port=2049,
+                protocol="tcp",
+                source_security_group_id=node_security_group.id,
+                description="Allow NFS within node security group",
+                opts=pulumi.ResourceOptions(
+                    parent=self,
+                    depends_on=[node_security_group],
+                    provider=self.aws_provider,
+                ),
+            ),
+            aws.ec2.SecurityGroupRule(
                 f"{self.name}-nodesg-allow-kubelet-ingress",
                 type="ingress",
                 security_group_id=node_security_group.id,
@@ -370,7 +389,6 @@ class EKSCluster(pulumi.ComponentResource):
                 parent=self,
                 depends_on=dependencies,
                 provider=self.k8s_provider,
-                retain_on_delete=True,
             ),
         )
 
@@ -426,13 +444,14 @@ class EKSCluster(pulumi.ComponentResource):
         return observability_namespace, aws_logging_configmap
 
 
-class EKSClusterAddon(Protocol):
-    """Protocol for EKS cluster addons."""
+class EKSClusterAddon(ABC):
+    """Abstract base class for EKS cluster addons."""
 
-    # Optional version key to look up in ComponentVersions
-    version_key: str | None
+    # Required version key to look up in ComponentVersions
+    version_key: ClassVar[str]
 
     @classmethod
+    @abstractmethod
     def from_cluster(
         cls,
         cluster: "EKSCluster",
@@ -465,17 +484,22 @@ class EKSClusterAddonInstaller(pulumi.ComponentResource):
         )
 
         self.cluster = cluster
+        self.versions = versions or config.ComponentVersions()
+
         self.addons = []
 
         for addon_type in addon_types:
             prev = self.addons and [self.addons[-1]] or None
 
             # Determine version
-            version = None
-            if versions:
-                key = getattr(addon_type, "version_key", None)
-                if key and hasattr(versions, key):
-                    version = getattr(versions, key)
+            try:
+                version: str = getattr(self.versions, addon_type.version_key)
+            except AttributeError as e:
+                e.add_note(
+                    f"Version key '{addon_type.version_key}' not a member variable of the class 'ComponentVersions'.\n"
+                    "Must add it to the 'ComponentVersions' class definition with a default value."
+                )
+                raise e
 
             addon = addon_type.from_cluster(
                 self.cluster,
