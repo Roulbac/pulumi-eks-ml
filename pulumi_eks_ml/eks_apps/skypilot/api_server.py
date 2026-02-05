@@ -1,18 +1,21 @@
 """SkyPilot API Server addon for EKS."""
 
-from textwrap import dedent
 from typing import Mapping
-import json
+
 import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as k8s
-import pulumi_random as random
-import yaml
-from passlib.hash import apr_md5_crypt
 
 from ...eks.cluster import EKSCluster
 from ...eks.config import SKYPILOT_API_SERVER_VERSION, EFS_CSI_DEFAULT_SC_NAME
 from ...eks.irsa import IRSA
+from .config_builder import (
+    build_api_service_config,
+    build_aws_credentials_secret,
+    build_values,
+)
+from .credentials import SkyPilotAdminCredentials
+from .iam import build_api_service_policy
 
 
 class SkyPilotAPIServer(pulumi.ComponentResource):
@@ -65,58 +68,13 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
         # ----------------------------------------------------------------------
         # SkyPilot Admin Credentials
         # ----------------------------------------------------------------------
-        web_username = "skypilot"
-        web_password = random.RandomPassword(
-            f"{name}-admin-pw",
-            length=16,
-            special=False,
-            opts=k8s_opts.merge(pulumi.ResourceOptions(depends_on=[namespace_res])),
-        )
-        salt = random.RandomPassword(
-            f"{name}-admin-pw-salt",
-            length=8,
-            special=False,
-            opts=k8s_opts.merge(pulumi.ResourceOptions(depends_on=[namespace_res])),
-        )
-
-        # Build stable htpasswd line using a deterministic salt
-        auth_value = pulumi.Output.all(web_password.result, salt.result).apply(
-            lambda args: (
-                f"{web_username}:{apr_md5_crypt.using(salt=args[1]).hash(args[0])}"
-            )
-        )
-
-        _ = k8s.core.v1.Secret(
-            f"{name}-admin-k8s-creds",
-            metadata={
-                "name": "initial-basic-auth",
-                "namespace": namespace,
-            },
-            string_data={"auth": auth_value},
-            type="Opaque",
-            opts=k8s_opts.merge(pulumi.ResourceOptions(depends_on=[namespace_res])),
-        )
-
-        # Store Admin Credentials in Secrets Manager
-        admin_secret = aws.secretsmanager.Secret(
-            f"{name}-admin-secret",
-            name_prefix=f"{name}-admin-creds-",
-            description="SkyPilot API Server Admin Credentials",
-            opts=aws_opts,
-        )
-
-        _ = aws.secretsmanager.SecretVersion(
-            f"{name}-admin-secret-version",
-            secret_id=admin_secret.id,
-            secret_string=pulumi.Output.all(web_password.result).apply(
-                lambda args: json.dumps(
-                    {
-                        "username": web_username,
-                        "password": args[0],
-                    }
-                )
-            ),
-            opts=aws_opts,
+        admin_credentials = SkyPilotAdminCredentials(
+            f"{name}-admin-credentials",
+            namespace=namespace,
+            k8s_opts=k8s_opts,
+            aws_opts=aws_opts,
+            depends_on=[namespace_res],
+            opts=pulumi.ResourceOptions(parent=self),
         )
 
         kubeconfig_secret = k8s.core.v1.Secret(
@@ -136,103 +94,7 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
         api_service_policy = aws.iam.Policy(
             f"{name}-api-service-policy",
             name=f"{cluster.name}-{namespace}-api-service-policy",
-            policy=pulumi.Output.json_dumps(
-                {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Action": "ec2:RunInstances",
-                            "Resource": "arn:aws:ec2:*::image/ami-*",
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": "ec2:RunInstances",
-                            "Resource": [
-                                f"arn:aws:ec2:*:{account_id}:instance/*",
-                                f"arn:aws:ec2:*:{account_id}:network-interface/*",
-                                f"arn:aws:ec2:*:{account_id}:subnet/*",
-                                f"arn:aws:ec2:*:{account_id}:volume/*",
-                                f"arn:aws:ec2:*:{account_id}:security-group/*",
-                            ],
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "ec2:TerminateInstances",
-                                "ec2:DeleteTags",
-                                "ec2:StartInstances",
-                                "ec2:CreateTags",
-                                "ec2:StopInstances",
-                            ],
-                            "Resource": f"arn:aws:ec2:*:{account_id}:instance/*",
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "ec2:Describe*",
-                            ],
-                            "Resource": "*",
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "ec2:CreateSecurityGroup",
-                                "ec2:AuthorizeSecurityGroupIngress",
-                            ],
-                            "Resource": f"arn:aws:ec2:*:{account_id}:*",
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": "iam:CreateServiceLinkedRole",
-                            "Resource": "*",
-                            "Condition": {
-                                "StringEquals": {
-                                    "iam:AWSServiceName": "spot.amazonaws.com"
-                                }
-                            },
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "iam:GetRole",
-                                "iam:PassRole",
-                                "iam:CreateRole",
-                                "iam:AttachRolePolicy",
-                            ],
-                            "Resource": [
-                                f"arn:aws:iam::{account_id}:role/skypilot-v1",
-                            ],
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "iam:GetInstanceProfile",
-                                "iam:CreateInstanceProfile",
-                                "iam:AddRoleToInstanceProfile",
-                            ],
-                            "Resource": f"arn:aws:iam::{account_id}:instance-profile/skypilot-v1",
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "ec2:CreateImage",
-                                "ec2:CopyImage",
-                                "ec2:DeregisterImage",
-                            ],
-                            "Resource": "*",
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "ec2:DeleteSecurityGroup",
-                                "ec2:ModifyInstanceAttribute",
-                            ],
-                            "Resource": f"arn:aws:ec2:*:{account_id}:*",
-                        },
-                    ],
-                }
-            ),
+            policy=pulumi.Output.json_dumps(build_api_service_policy(account_id)),
             opts=aws_opts,
         )
 
@@ -254,16 +116,6 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
             opts=aws_opts,
         )
 
-        def build_aws_credentials_secret(
-            cluster_region: str, irsa_role_arn: str
-        ) -> str:
-            return dedent(f"""
-                [default]
-                role_arn = {irsa_role_arn}
-                region = {cluster_region}
-                web_identity_token_file = /var/run/secrets/eks.amazonaws.com/serviceaccount/token
-                """)
-
         aws_credentials_secret = k8s.core.v1.Secret(
             f"{name}-aws-creds",
             metadata={
@@ -282,84 +134,15 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
             opts=k8s_opts.merge(pulumi.ResourceOptions(depends_on=[namespace_res])),
         )
 
-        def build_api_service_config(
-            service_accounts_by_context: Mapping[str, str],
-        ) -> str:
-            return yaml.safe_dump(
-                {
-                    "allowed_clouds": ["aws", "kubernetes"],
-                    "kubernetes": {
-                        "allowed_contexts": list(service_accounts_by_context.keys()),
-                        "context_configs": {
-                            k: {"remote_identity": v}
-                            for k, v in service_accounts_by_context.items()
-                        },
-                        "custom_metadata": {
-                            "annotations": {
-                                "alb.ingress.kubernetes.io/scheme": "internal"
-                            }
-                        },
-                    },
-                    "jobs": {"controller": {"consolidation_mode": True}},
-                }
-            )
-
         self.api_service_config = pulumi.Output.all(
             service_accounts_by_context=service_accounts_by_context,
         ).apply(lambda kwargs: build_api_service_config(**kwargs))
-
-        def build_values(
-            subnet_ids: list[str],
-            irsa_role_arn: str,
-            api_service_config: str,
-        ) -> dict:
-            values: dict = {
-                "ingress": {
-                    "enabled": True,
-                    "unified": True,
-                    "ingressClassName": "alb",
-                    "annotations": {
-                        "alb.ingress.kubernetes.io/scheme": "internal",
-                        "alb.ingress.kubernetes.io/target-type": "ip",
-                        "alb.ingress.kubernetes.io/healthcheck-path": "/api/health",
-                        "alb.ingress.kubernetes.io/subnets": ",".join(subnet_ids),
-                    },
-                },
-                "ingress-nginx": {"enabled": False},
-                "apiService": {
-                    "initialBasicAuthSecret": "initial-basic-auth",
-                    "enableUserManagement": True,
-                    "config": api_service_config,
-                },
-                "awsCredentials": {
-                    "enabled": True,
-                    "useCredentialsFile": True,
-                },
-                "rbac": {
-                    "serviceAccountAnnotations": {
-                        "eks.amazonaws.com/role-arn": irsa_role_arn
-                    },
-                },
-                "storage": {
-                    "enabled": True,
-                    "storageClassName": EFS_CSI_DEFAULT_SC_NAME,
-                    "accessMode": "ReadWriteMany",
-                    "size": "64Gi",
-                },
-            }
-
-            values["kubernetesCredentials"] = {
-                "useApiServerCluster": False,
-                "useKubeconfig": True,
-                "kubeconfigSecretName": "kube-credentials",
-            }
-
-            return values
 
         values = pulumi.Output.all(
             subnet_ids=cluster.subnet_ids,
             irsa_role_arn=api_service_irsa.iam_role_arn,
             api_service_config=self.api_service_config,
+            storage_class_name=EFS_CSI_DEFAULT_SC_NAME,
         ).apply(lambda kwargs: build_values(**kwargs))
 
         # Install the Helm release
@@ -396,9 +179,9 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
         self.ingress_status = self.ingress.status
 
         # Expose outputs
-        self.admin_username = pulumi.Output.from_input(web_username)
-        self.admin_password = pulumi.Output.secret(web_password.result)
-        self.admin_secret_arn = admin_secret.arn
+        self.admin_username = admin_credentials.username
+        self.admin_password = admin_credentials.password
+        self.admin_secret_arn = admin_credentials.secret_arn
 
         self.register_outputs(
             {
