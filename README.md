@@ -129,10 +129,6 @@ uv sync --dev
 cd projects/starter
 pulumi stack init dev
 pulumi config set aws:region us-west-2
-pulumi config set --path node_pools[0].name general
-pulumi config set --path node_pools[0].instance_type t3.large
-pulumi config set --path node_pools[0].min_size 1
-pulumi config set --path node_pools[0].max_size 3
 uv run pulumi up
 ```
 
