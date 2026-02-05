@@ -31,7 +31,7 @@ class TestIRSA:
         )
         OIDC_PROVIDER_ARN = "arn:aws:iam::000000000000:oidc-provider/oidc.eks.us-east-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B716D3041E"
         TRUST_SA_NAMESPACE = "kube-system"
-        TRUST_SA_NAME = "external-dns"
+        TRUST_SA_NAME = "external-dns*"
 
     @staticmethod
     def _irsa_program() -> None:
@@ -41,10 +41,10 @@ class TestIRSA:
         irsa = IRSA(
             "irsa",
             role_name=role_name,
-            oidc_provider_arn=TestIRSA._TestIRSAParams.OIDC_PROVIDER_ARN,
-            oidc_issuer=TestIRSA._TestIRSAParams.OIDC_ISSUER,
-            trust_sa_namespace=TestIRSA._TestIRSAParams.TRUST_SA_NAMESPACE,
-            trust_sa_name=TestIRSA._TestIRSAParams.TRUST_SA_NAME,
+            oidc_provider_arn=TestIRSA._TestIRSAParams.OIDC_PROVIDER_ARN.value,
+            oidc_issuer=TestIRSA._TestIRSAParams.OIDC_ISSUER.value,
+            trust_sa_namespace=TestIRSA._TestIRSAParams.TRUST_SA_NAMESPACE.value,
+            trust_sa_name=TestIRSA._TestIRSAParams.TRUST_SA_NAME.value,
             opts=pulumi.ResourceOptions(provider=provider),
         )
 
@@ -67,12 +67,14 @@ class TestIRSA:
             statement = assume_policy["Statement"][0]
             assert statement == {
                 "Effect": "Allow",
-                "Principal": {"Federated": TestIRSA._TestIRSAParams.OIDC_PROVIDER_ARN},
+                "Principal": {"Federated": TestIRSA._TestIRSAParams.OIDC_PROVIDER_ARN.value},
                 "Action": "sts:AssumeRoleWithWebIdentity",
                 "Condition": {
+                    "StringLike": {
+                        f"{TestIRSA._TestIRSAParams.OIDC_ISSUER.value}:sub": f"system:serviceaccount:{TestIRSA._TestIRSAParams.TRUST_SA_NAMESPACE.value}:{TestIRSA._TestIRSAParams.TRUST_SA_NAME.value}",
+                    },
                     "StringEquals": {
-                        f"{TestIRSA._TestIRSAParams.OIDC_ISSUER}:sub": f"system:serviceaccount:{TestIRSA._TestIRSAParams.TRUST_SA_NAMESPACE}:{TestIRSA._TestIRSAParams.TRUST_SA_NAME}",
-                        f"{TestIRSA._TestIRSAParams.OIDC_ISSUER}:aud": "sts.amazonaws.com",
+                        f"{TestIRSA._TestIRSAParams.OIDC_ISSUER.value}:aud": "sts.amazonaws.com",
                     }
                 },
             }

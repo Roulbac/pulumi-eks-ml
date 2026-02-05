@@ -13,6 +13,9 @@ def _build_irsa_assume_role_policy(
     trust_sa_name: str,
 ) -> dict:
     """Build the IRSA assume role policy document."""
+    sub_pattern = f"system:serviceaccount:{trust_sa_namespace}:{trust_sa_name}"
+    sub_condition_key = "StringLike" if "*" in trust_sa_name else "StringEquals"
+    sub_condition = {f"{oidc_issuer}:sub": sub_pattern}
     return {
         "Version": "2012-10-17",
         "Statement": [
@@ -21,12 +24,10 @@ def _build_irsa_assume_role_policy(
                 "Principal": {"Federated": oidc_provider_arn},
                 "Action": "sts:AssumeRoleWithWebIdentity",
                 "Condition": {
+                    sub_condition_key: sub_condition,
                     "StringEquals": {
-                        f"{oidc_issuer}:sub": (
-                            f"system:serviceaccount:{trust_sa_namespace}:{trust_sa_name}"
-                        ),
                         f"{oidc_issuer}:aud": "sts.amazonaws.com",
-                    }
+                    },
                 },
             }
         ],

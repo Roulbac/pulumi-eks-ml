@@ -1,0 +1,16 @@
+config:
+  pulumi:disable-autonaming: "true"
+  hub:
+    region: us-east-2
+    sp_data_planes:
+      - name: team-a
+      - name: team-b
+      - name: team-c
+    node_pools:
+      - capacity_type: on-demand
+        instance_category: [t]
+        name: general
+    tailscale:
+      enabled: true
+      oauth_secret_arn: <YOUR_TAILSCALE_OAUTH_SECRET_ARN>
+  spokes: []

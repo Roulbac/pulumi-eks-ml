@@ -24,7 +24,8 @@ Update `Pulumi.dev.yaml` (or your stack file) with these keys:
 - `aws:region` (required by the AWS provider)
 - `node_pools` (array of node pool objects)
 
-Each node pool uses a single `instance_type` string. Example:
+Each node pool uses an `instance_type` list and can optionally set
+`instance_family` and `instance_category` lists. Example:
 
 ```yaml
 config:
@@ -32,10 +33,10 @@ config:
   node_pools:
     - name: general
       capacity_type: on-demand
-      instance_type: t3.large
-    - name: gpu-light
+      instance_category: [t]
+    - name: gpu
       capacity_type: on-demand
-      instance_type: g5.2xlarge
+      instance_category: [g]
 ```
 
 ### Run it

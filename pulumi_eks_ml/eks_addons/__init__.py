@@ -4,20 +4,18 @@ from ..eks.cluster import EKSClusterAddon
 
 from .alb_controller_addon import AlbControllerAddon
 from .ebs_csi_addon import EbsCsiAddon
-from .efs_csi_addon import EfsCsiAddon
+from .efs_csi_addon import EFSCSIAddon
 from .fluent_bit_addon import FluentBitAddon
 from .metrics_server_addon import MetricsServerAddon
 from .nvidia_device_plugin_addon import NvidiaDevicePluginAddon
-from .tailscale_subnet_router_addon import TailscaleSubnetRouterAddon
 
 __all__ = [
     "AlbControllerAddon",
     "EbsCsiAddon",
-    "EfsCsiAddon",
+    "EFSCSIAddon",
     "FluentBitAddon",
     "MetricsServerAddon",
     "NvidiaDevicePluginAddon",
-    "TailscaleSubnetRouterAddon",
 ]
 
 
@@ -34,7 +32,7 @@ def recommended_addons() -> list[type[EKSClusterAddon]]:
     """
     return [
         EbsCsiAddon,
-        EfsCsiAddon,
+        EFSCSIAddon,
         AlbControllerAddon,
         MetricsServerAddon,
         FluentBitAddon,

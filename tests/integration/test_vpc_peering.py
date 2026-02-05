@@ -6,6 +6,7 @@ import pulumi.automation as auto
 import pulumi_aws as aws
 
 from pulumi_eks_ml import vpc
+from pulumi_eks_ml.vpc.multi_region import VPCPeeringStrategy
 from tests.integration.conftest import pulumi_stack_factory
 
 
@@ -78,10 +79,11 @@ class TestHubAndSpokeVPCPeering:
             opts=pulumi.ResourceOptions(provider=spoke_providers[1]),
         )
 
-        peering = vpc.HubAndSpokePeeringStrategy(
+        peering = VPCPeeringStrategy(
             "hub-spoke",
-            hub_vpc=hub_vpc,
-            spoke_vpcs=[spoke_a, spoke_b],
+            vpcs=[hub_vpc, spoke_a, spoke_b],
+            topology="hub_and_spoke",
+            hub=TestHubAndSpokeVPCPeering.HUB_REGION,
             opts=pulumi.ResourceOptions(provider=hub_provider),
         )
 

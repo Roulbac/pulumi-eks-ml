@@ -1,0 +1,22 @@
+name: multi-region
+description: A multi-region project with one VPC and one EKS cluster per region, peered in a full mesh topology.
+runtime:
+  name: python
+  options:
+    toolchain: uv
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: python
+  component_versions:
+    type: object
+    description: Override versions for EKS addons and components.
+    default: {}
+  hub:
+    type: object
+    description: Configuration for the primary hub region (control plane + data planes).
+  spokes:
+    type: array
+    description: Configuration for spoke regions (data planes only).
+    items:
+      type: object

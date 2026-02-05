@@ -1,7 +1,7 @@
 [project]
-name = "starter"
+name = "multi-region"
 version = "0.1.0"
-description = "A minimal starter project with a single EKS cluster in one region"
+description = "A project for deploying a multi-region EKS architecture, with a single VPC and one EKS cluster per region, peered in a full mesh topology."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

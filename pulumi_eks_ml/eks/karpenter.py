@@ -288,7 +288,7 @@ class KarpenterAddon(pulumi.ComponentResource):
         self.namespace = k8s.core.v1.Namespace(
             f"{name}-ns",
             metadata={"name": config.KARPENTER_NAMESPACE},
-            opts=pulumi.ResourceOptions(parent=self, retain_on_delete=True, provider=self._k8s_provider),
+            opts=pulumi.ResourceOptions(parent=self, provider=self._k8s_provider),
         )
 
         # IAM: controller IRSA and node role
@@ -453,6 +453,37 @@ class KarpenterAddon(pulumi.ComponentResource):
             ),
         )
 
+        node_pool_requirements = [
+            {
+                "key": "karpenter.sh/capacity-type",
+                "operator": "In",
+                "values": [node_pool.capacity_type],
+            },
+            {
+                # DO NOT USE "node.kubernetes.io/instance-type" HERE!
+                "key": "kubernetes.io/arch",
+                "operator": "In",
+                "values": [node_pool.architecture],
+            },
+        ]
+
+        if node_pool.instance_family:
+            node_pool_requirements.append(
+                {
+                    "key": "karpenter.k8s.aws/instance-family",
+                    "operator": "In",
+                    "values": node_pool.instance_family,
+                }
+            )
+        if node_pool.instance_category:
+            node_pool_requirements.append(
+                {
+                    "key": "karpenter.k8s.aws/instance-category",
+                    "operator": "In",
+                    "values": node_pool.instance_category,
+                }
+            )
+
         node_pool_spec = {
             "limits": {"cpu": node_pool.vcpu_limit, "memory": node_pool.memory_limit},
             "template": {
@@ -463,16 +494,7 @@ class KarpenterAddon(pulumi.ComponentResource):
                         "kind": "EC2NodeClass",
                     },
                     "requirements": [
-                        {
-                            "key": "karpenter.sh/capacity-type",
-                            "operator": "In",
-                            "values": [node_pool.capacity_type],
-                        },
-                        {
-                            "key": "node.kubernetes.io/instance-type",
-                            "operator": "In",
-                            "values": [node_pool.instance_type],
-                        },
+                        *node_pool_requirements,
                     ],
                     "expireAfter": "720h",
                 }
