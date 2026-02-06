@@ -45,18 +45,24 @@ def build_values(
     irsa_role_arn: str,
     api_service_config: str,
     storage_class_name: str,
+    ingress_host: str,
+    ingress_ssl_cert_arn: str,
 ) -> dict:
     """Build the Helm values for the SkyPilot API server chart."""
     values: dict = {
         "ingress": {
             "enabled": True,
             "unified": True,
+            "host": ingress_host,
             "ingressClassName": "alb",
             "annotations": {
                 "alb.ingress.kubernetes.io/scheme": "internal",
                 "alb.ingress.kubernetes.io/target-type": "ip",
                 "alb.ingress.kubernetes.io/healthcheck-path": "/api/health",
                 "alb.ingress.kubernetes.io/subnets": ",".join(subnet_ids),
+                "alb.ingress.kubernetes.io/certificate-arn": ingress_ssl_cert_arn,
+                "alb.ingress.kubernetes.io/listen-ports": '[{"HTTPS":443}]',
+                "alb.ingress.kubernetes.io/ssl-redirect": "443",
             },
         },
         "ingress-nginx": {"enabled": False},

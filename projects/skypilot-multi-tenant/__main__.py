@@ -16,6 +16,7 @@ from pulumi_eks_ml.eks_apps.skypilot import (
     SkyPilotDataPlaneRequest,
     SkyPilotDataPlaneUserIdentityProvisioner,
     SkyPilotDataPlaneUserIdentityRequest,
+    SkyPilotServiceDiscovery,
 )
 
 from config import get_all_regions, load_project_config
@@ -104,15 +105,14 @@ for spoke in config.spokes:
 # ------------------------------------------------------------------------------
 # Tailscale (Hub Only)
 # ------------------------------------------------------------------------------
-if config.hub.tailscale.enabled:
-    eks_apps.TailscaleSubnetRouter(
-        name=f"{deployment_name}-{config.hub.region}-ts",
-        cluster=hub_cluster,
-        oauth_secret_arn=config.hub.tailscale.oauth_secret_arn,
-        advertised_routes=[vpc_network.vpcs[r].vpc_cidr_block for r in all_regions],
-        version=component_versions.tailscale_operator,
-        opts=pulumi.ResourceOptions(depends_on=cluster_dependencies),
-    )
+eks_apps.TailscaleSubnetRouter(
+    name=f"{deployment_name}-{config.hub.region}-ts",
+    cluster=hub_cluster,
+    oauth_secret_arn=config.hub.tailscale.oauth_secret_arn,
+    advertised_routes=[vpc_network.vpcs[r].vpc_cidr_block for r in all_regions],
+    version=component_versions.tailscale_operator,
+    opts=pulumi.ResourceOptions(depends_on=cluster_dependencies),
+)
 
 # ------------------------------------------------------------------------------
 # SkyPilot
@@ -150,6 +150,8 @@ dp_provisioner = SkyPilotDataPlaneProvisioner(
 sp = SkyPilotAPIServer(
     name=f"{deployment_name}-sp-api-server",
     cluster=clusters[config.hub.region][0],
+    ingress_host=config.hub.skypilot.ingress_host,
+    ingress_ssl_cert_arn=config.hub.skypilot.ingress_ssl_cert_arn,
     kubeconfig=dp_provisioner.api_server_kube_config,
     service_accounts_by_context=user_identities.service_accounts_by_context,
     opts=pulumi.ResourceOptions(
@@ -159,6 +161,14 @@ sp = SkyPilotAPIServer(
             user_identities,
         ]
     ),
+)
+
+service_discovery = SkyPilotServiceDiscovery(
+    name=f"{deployment_name}-sp-service-discovery",
+    hostname=config.hub.skypilot.ingress_host,
+    vpc_ids=[vpc_network.vpcs[region].vpc_id for region in all_regions],
+    vpc_regions=all_regions,
+    opts=pulumi.ResourceOptions(depends_on=[*cluster_dependencies, vpc_network]),
 )
 
 # ------------------------------------------------------------------------------

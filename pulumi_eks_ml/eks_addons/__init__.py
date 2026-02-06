@@ -5,6 +5,7 @@ from ..eks.cluster import EKSClusterAddon
 from .alb_controller_addon import AlbControllerAddon
 from .ebs_csi_addon import EbsCsiAddon
 from .efs_csi_addon import EFSCSIAddon
+from .external_dns_addon import ExternalDNSAddon
 from .fluent_bit_addon import FluentBitAddon
 from .metrics_server_addon import MetricsServerAddon
 from .nvidia_device_plugin_addon import NvidiaDevicePluginAddon
@@ -13,6 +14,7 @@ __all__ = [
     "AlbControllerAddon",
     "EbsCsiAddon",
     "EFSCSIAddon",
+    "ExternalDNSAddon",
     "FluentBitAddon",
     "MetricsServerAddon",
     "NvidiaDevicePluginAddon",
@@ -26,6 +28,7 @@ def recommended_addons() -> list[type[EKSClusterAddon]]:
     - EBS CSI driver
     - EFS CSI driver
     - ALB Controller
+    - ExternalDNS
     - Metrics Server
     - Fluent Bit
     - NVIDIA Device Plugin
@@ -34,6 +37,7 @@ def recommended_addons() -> list[type[EKSClusterAddon]]:
         EbsCsiAddon,
         EFSCSIAddon,
         AlbControllerAddon,
+        ExternalDNSAddon,
         MetricsServerAddon,
         FluentBitAddon,
         NvidiaDevicePluginAddon,

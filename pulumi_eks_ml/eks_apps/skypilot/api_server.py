@@ -18,6 +18,7 @@ from .credentials import SkyPilotAdminCredentials
 from .iam import build_api_service_policy
 
 
+
 class SkyPilotAPIServer(pulumi.ComponentResource):
     """Component that installs the SkyPilot API server Helm chart.
 
@@ -38,6 +39,8 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
         name: str,
         cluster: EKSCluster,
         kubeconfig: pulumi.Input[str],
+        ingress_host: pulumi.Input[str],
+        ingress_ssl_cert_arn: pulumi.Input[str],
         version: str = SKYPILOT_API_SERVER_VERSION,
         service_accounts_by_context: pulumi.Input[Mapping[str, str]] | None = None,
         namespace: str = "skypilot",
@@ -143,6 +146,8 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
             irsa_role_arn=api_service_irsa.iam_role_arn,
             api_service_config=self.api_service_config,
             storage_class_name=EFS_CSI_DEFAULT_SC_NAME,
+            ingress_host=ingress_host,
+            ingress_ssl_cert_arn=ingress_ssl_cert_arn,
         ).apply(lambda kwargs: build_values(**kwargs))
 
         # Install the Helm release

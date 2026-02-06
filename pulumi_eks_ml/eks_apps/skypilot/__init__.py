@@ -6,6 +6,7 @@ from .data_plane_irsa import (
     SkyPilotDataPlaneUserIdentityProvisioner,
     SkyPilotDataPlaneUserIdentityRequest,
 )
+from .service_discovery import SkyPilotServiceDiscovery
 
 __all__ = [
     "SkyPilotAPIServer",
@@ -13,4 +14,5 @@ __all__ = [
     "SkyPilotDataPlaneRequest",
     "SkyPilotDataPlaneUserIdentityProvisioner",
     "SkyPilotDataPlaneUserIdentityRequest",
+    "SkyPilotServiceDiscovery",
 ]
