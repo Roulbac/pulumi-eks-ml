@@ -11,6 +11,7 @@ from pulumi_eks_ml import eks
 class SkyPilotConfig(BaseModel):
     ingress_host: str
     ingress_ssl_cert_arn: str
+    oauth_client_secret_arn: str | None = None
 
 class TailscaleConfig(BaseModel):
     oauth_secret_arn: str

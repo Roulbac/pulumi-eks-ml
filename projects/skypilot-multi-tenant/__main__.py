@@ -12,6 +12,7 @@ import pulumi
 from pulumi_eks_ml import eks, eks_addons, eks_apps, vpc
 from pulumi_eks_ml.eks_apps.skypilot import (
     SkyPilotAPIServer,
+    SkyPilotCognitoIDP,
     SkyPilotDataPlaneProvisioner,
     SkyPilotDataPlaneRequest,
     SkyPilotDataPlaneUserIdentityProvisioner,
@@ -147,11 +148,33 @@ dp_provisioner = SkyPilotDataPlaneProvisioner(
     opts=pulumi.ResourceOptions(depends_on=cluster_dependencies),
 )
 
+sp_service_discovery = SkyPilotServiceDiscovery(
+    name=f"{deployment_name}-sp-service-discovery",
+    hostname=config.hub.skypilot.ingress_host,
+    vpc_ids=[vpc_network.vpcs[region].vpc_id for region in all_regions],
+    vpc_regions=all_regions,
+    opts=pulumi.ResourceOptions(depends_on=[*cluster_dependencies, vpc_network]),
+)
+
+sp_cognito_idp = SkyPilotCognitoIDP(
+    name=f"{deployment_name}-sp-cognito",
+    region=config.hub.region,
+    callback_url=f"https://{config.hub.skypilot.ingress_host}/oauth2/callback",
+    opts=pulumi.ResourceOptions(
+        depends_on=[*cluster_dependencies],
+    ),
+)
+
+hub_cluster, _ = clusters[config.hub.region]
+
 sp = SkyPilotAPIServer(
     name=f"{deployment_name}-sp-api-server",
-    cluster=clusters[config.hub.region][0],
+    cluster=hub_cluster,
     ingress_host=config.hub.skypilot.ingress_host,
     ingress_ssl_cert_arn=config.hub.skypilot.ingress_ssl_cert_arn,
+    oidc_issuer_url=sp_cognito_idp.oidc_issuer_url,
+    oidc_client_id=sp_cognito_idp.skypilot_client_id,
+    oidc_client_secret=sp_cognito_idp.skypilot_client_secret,
     kubeconfig=dp_provisioner.api_server_kube_config,
     service_accounts_by_context=user_identities.service_accounts_by_context,
     opts=pulumi.ResourceOptions(
@@ -159,16 +182,10 @@ sp = SkyPilotAPIServer(
             *cluster_dependencies,
             dp_provisioner,
             user_identities,
+            sp_service_discovery,
+            sp_cognito_idp,
         ]
     ),
-)
-
-service_discovery = SkyPilotServiceDiscovery(
-    name=f"{deployment_name}-sp-service-discovery",
-    hostname=config.hub.skypilot.ingress_host,
-    vpc_ids=[vpc_network.vpcs[region].vpc_id for region in all_regions],
-    vpc_regions=all_regions,
-    opts=pulumi.ResourceOptions(depends_on=[*cluster_dependencies, vpc_network]),
 )
 
 # ------------------------------------------------------------------------------

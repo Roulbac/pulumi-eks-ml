@@ -47,6 +47,8 @@ def build_values(
     storage_class_name: str,
     ingress_host: str,
     ingress_ssl_cert_arn: str,
+    oauth_issuer_url: str | None = None,
+    oauth_client_secret_name: str | None = None,
 ) -> dict:
     """Build the Helm values for the SkyPilot API server chart."""
     values: dict = {
@@ -67,8 +69,8 @@ def build_values(
         },
         "ingress-nginx": {"enabled": False},
         "apiService": {
-            "initialBasicAuthSecret": "initial-basic-auth",
-            "enableUserManagement": True,
+            # "initialBasicAuthSecret": "initial-basic-auth",
+            # "enableUserManagement": True,
             "config": api_service_config,
         },
         "awsCredentials": {
@@ -92,5 +94,14 @@ def build_values(
             "kubeconfigSecretName": "kube-credentials",
         },
     }
+
+    if oauth_issuer_url and oauth_client_secret_name:
+        values["auth"] = {
+            "oauth": {
+                "enabled": True,
+                "oidc-issuer-url": oauth_issuer_url,
+                "client-details-from-secret": oauth_client_secret_name,
+            }
+        }
 
     return values

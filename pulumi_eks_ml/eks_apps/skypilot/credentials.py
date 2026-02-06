@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import ClassVar
 
 import pulumi
 import pulumi_aws as aws
@@ -97,3 +98,50 @@ class SkyPilotAdminCredentials(pulumi.ComponentResource):
                 "secret_arn": self.secret_arn,
             }
         )
+
+
+class SkyPilotOAuthCredentials(pulumi.ComponentResource):
+    """Creates OAuth client credentials secret for SkyPilot API server."""
+
+    secret_name: pulumi.Output[str]
+
+    # This is the name of the secret that will be created in the namespace.
+    _OAUTH_SECRET_NAME: ClassVar[str] = "oauth2-proxy-credentials"
+
+    def __init__(
+        self,
+        name: str,
+        namespace: str,
+        client_id: pulumi.Input[str],
+        client_secret: pulumi.Input[str],
+        depends_on: list[pulumi.Resource] | None = None,
+        opts: pulumi.ResourceOptions | None = None,
+    ) -> None:
+        super().__init__("pulumi-eks-ml:eks:SkyPilotOAuthCredentials", name, None, opts)
+
+        oauth_secret_payload = pulumi.Output.all(
+            client_id=client_id,
+            client_secret=client_secret,
+        ).apply(
+            lambda args: {
+                "client-id": args["client_id"],
+                "client-secret": args["client_secret"],
+            }
+        )
+
+        _ = k8s.core.v1.Secret(
+            f"{name}-oauth-credentials",
+            metadata={
+                "name": SkyPilotOAuthCredentials._OAUTH_SECRET_NAME,
+                "namespace": namespace,
+            },
+            string_data=oauth_secret_payload,
+            type="Opaque",
+            opts=(opts or pulumi.ResourceOptions()).merge(
+                pulumi.ResourceOptions(parent=self, depends_on=depends_on)
+            ),
+        )
+
+        self.secret_name = pulumi.Output.from_input(SkyPilotOAuthCredentials._OAUTH_SECRET_NAME)
+
+        self.register_outputs({"secret_name": self.secret_name})

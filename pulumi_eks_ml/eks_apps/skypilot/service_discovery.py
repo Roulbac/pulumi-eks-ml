@@ -21,9 +21,7 @@ class SkyPilotServiceDiscovery(pulumi.ComponentResource):
         vpc_regions: list[pulumi.Input[str]] | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        super().__init__(
-            "pulumi-eks-ml:eks:SkyPilotServiceDiscovery", name, None, opts
-        )
+        super().__init__("pulumi-eks-ml:eks:SkyPilotServiceDiscovery", name, None, opts)
 
         if len(vpc_ids) == 0:
             raise ValueError("At least one VPC ID is required to create a private zone")
@@ -58,3 +56,5 @@ class SkyPilotServiceDiscovery(pulumi.ComponentResource):
                 "zone_name": self.zone_name,
             }
         )
+
+

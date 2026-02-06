@@ -14,9 +14,8 @@ from .config_builder import (
     build_aws_credentials_secret,
     build_values,
 )
-from .credentials import SkyPilotAdminCredentials
+from .credentials import SkyPilotAdminCredentials, SkyPilotOAuthCredentials
 from .iam import build_api_service_policy
-
 
 
 class SkyPilotAPIServer(pulumi.ComponentResource):
@@ -41,8 +40,11 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
         kubeconfig: pulumi.Input[str],
         ingress_host: pulumi.Input[str],
         ingress_ssl_cert_arn: pulumi.Input[str],
+        oidc_issuer_url: pulumi.Input[str],
+        oidc_client_id: pulumi.Input[str],
+        oidc_client_secret: pulumi.Input[str],
+        service_accounts_by_context: pulumi.Input[Mapping[str, str]],
         version: str = SKYPILOT_API_SERVER_VERSION,
-        service_accounts_by_context: pulumi.Input[Mapping[str, str]] | None = None,
         namespace: str = "skypilot",
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
@@ -137,6 +139,16 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
             opts=k8s_opts.merge(pulumi.ResourceOptions(depends_on=[namespace_res])),
         )
 
+        oauth_credentials = SkyPilotOAuthCredentials(
+            f"{name}-oauth-credentials",
+            namespace=namespace,
+            client_id=oidc_client_id,
+            client_secret=oidc_client_secret,
+            opts=k8s_opts.merge(
+                pulumi.ResourceOptions(parent=self, depends_on=[namespace_res])
+            ),
+        )
+
         self.api_service_config = pulumi.Output.all(
             service_accounts_by_context=service_accounts_by_context,
         ).apply(lambda kwargs: build_api_service_config(**kwargs))
@@ -148,6 +160,8 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
             storage_class_name=EFS_CSI_DEFAULT_SC_NAME,
             ingress_host=ingress_host,
             ingress_ssl_cert_arn=ingress_ssl_cert_arn,
+            oauth_issuer_url=oidc_issuer_url,
+            oauth_client_secret_name=oauth_credentials.secret_name,
         ).apply(lambda kwargs: build_values(**kwargs))
 
         # Install the Helm release
@@ -169,6 +183,7 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
                         namespace_res,
                         kubeconfig_secret,
                         aws_credentials_secret,
+                        oauth_credentials,
                     ],
                 )
             ),

@@ -6,6 +6,8 @@ from .data_plane_irsa import (
     SkyPilotDataPlaneUserIdentityProvisioner,
     SkyPilotDataPlaneUserIdentityRequest,
 )
+from .credentials import SkyPilotOAuthCredentials
+from .idp import SkyPilotCognitoIDP
 from .service_discovery import SkyPilotServiceDiscovery
 
 __all__ = [
@@ -14,5 +16,7 @@ __all__ = [
     "SkyPilotDataPlaneRequest",
     "SkyPilotDataPlaneUserIdentityProvisioner",
     "SkyPilotDataPlaneUserIdentityRequest",
+    "SkyPilotCognitoIDP",
+    "SkyPilotOAuthCredentials",
     "SkyPilotServiceDiscovery",
 ]
