@@ -30,12 +30,12 @@ Update `Pulumi.dev.yaml` (or your stack file) with the following structure:
 -   `hub`: Configuration for the primary region.
     -   `region`: AWS region (e.g., `us-west-2`).
     -   `node_pools`: List of node pools for the cluster.
-    -   `sp_data_planes`: List of data planes (tenants) to provision in this region.
+-   `data_planes`: List of data planes (tenants) to provision in this region.
     -   `tailscale`: (Optional) Tailscale configuration.
 -   `spokes`: List of spoke region configurations.
     -   `region`: AWS region.
     -   `node_pools`: Node pools for this region.
-    -   `sp_data_planes`: List of data planes to provision here.
+-   `data_planes`: List of data planes to provision here.
 
 ### Example `Pulumi.dev.yaml`
 
@@ -53,7 +53,7 @@ config:
         capacity_type: spot
         instance_type: [g5.xlarge]
     # Define SkyPilot tenants/data planes for the Hub
-    sp_data_planes:
+    data_planes:
       - name: team-a-dev
         # Optional: Bring your own IAM role ARN
         # user_role_arn: arn:aws:iam::123456789012:role/TeamARole
@@ -71,7 +71,7 @@ config:
         - name: system
           capacity_type: on-demand
           instance_type: [t3.medium]
-      sp_data_planes:
+      data_planes:
         - name: team-a-latency-sensitive
 
     - region: eu-west-1
@@ -79,7 +79,7 @@ config:
         - name: gpu-workers
           capacity_type: spot
           instance_type: [g5.2xlarge]
-      sp_data_planes: [] # Just compute capacity, no specific tenant isolation required yet
+      data_planes: [] # Just compute capacity, no specific tenant isolation required yet
 ```
 
 ## Run it

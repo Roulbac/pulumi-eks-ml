@@ -11,7 +11,7 @@ from pulumi_eks_ml import eks
 class SkyPilotConfig(BaseModel):
     ingress_host: str
     ingress_ssl_cert_arn: str
-    oauth_client_secret_arn: str | None = None
+    data_planes: list[DataPlaneConfig] = Field(default_factory=list)
 
 class TailscaleConfig(BaseModel):
     oauth_secret_arn: str
@@ -25,7 +25,6 @@ class DataPlaneConfig(BaseModel):
 class RegionConfig(BaseModel):
     region: str
     node_pools: list[dict]
-    sp_data_planes: list[DataPlaneConfig] = Field(default_factory=list)
 
     @property
     def eks_node_pools(self) -> list[eks.NodePoolConfig]:

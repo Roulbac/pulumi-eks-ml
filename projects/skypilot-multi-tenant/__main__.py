@@ -123,7 +123,7 @@ identity_requests: list[SkyPilotDataPlaneUserIdentityRequest] = []
 
 for region_config in [config.hub, *config.spokes]:
     cluster, _ = clusters[region_config.region]
-    for dp in region_config.sp_data_planes:
+    for dp in region_config.skypilot.data_planes:
         dp_requests.append(SkyPilotDataPlaneRequest(cluster=cluster, namespace=dp.name))
 
         policies = [] if dp.user_role_arn else _DEFAULT_USER_POLICIES
