@@ -14,12 +14,11 @@ Use it as a reference or a starting point for your own topology.
 %%{init: {
   "theme": "base",
   "themeVariables": {
-    "fontFamily": "Inter, ui-sans-serif, system-ui",
     "fontSize": "14px",
     "lineColor": "#94a3b8",
     "textColor": "#1e293b"
   },
-  "flowchart": { "curve": "basis" }
+  "flowchart": { "curve": "basis", "padding": 16, "htmlLabels": false }
 }}%%
 
 flowchart LR

@@ -21,12 +21,11 @@ This solution creates a multi-region, private network for SkyPilot workloads.
 %%{init: {
   "theme": "base",
   "themeVariables": {
-    "fontFamily": "Inter, ui-sans-serif, system-ui",
     "fontSize": "14px",
     "lineColor": "#94a3b8",
     "textColor": "#1e293b"
   },
-  "flowchart": { "curve": "basis" }
+  "flowchart": { "curve": "basis", "padding": 16, "htmlLabels": false }
 }}%%
 
 flowchart LR
