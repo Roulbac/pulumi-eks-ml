@@ -33,8 +33,7 @@ class SkyPilotCognitoIDP(pulumi.ComponentResource):
         self.user_pool = aws.cognito.UserPool(
             f"{name}-pool",
             name=f"{name}-pool",
-            username_attributes=["email"],
-            auto_verified_attributes=["email"],
+            alias_attributes=["email", "preferred_username"],
             admin_create_user_config=aws.cognito.UserPoolAdminCreateUserConfigArgs(
                 allow_admin_create_user_only=True
             ),
@@ -94,7 +93,9 @@ class SkyPilotCognitoIDP(pulumi.ComponentResource):
 
         self.user_pool_name = self.user_pool.name
         self.user_pool_region = self.user_pool.region
-        self.oidc_issuer_url = pulumi.Output.format("https://{}", self.user_pool.endpoint)
+        self.oidc_issuer_url = pulumi.Output.format(
+            "https://{}", self.user_pool.endpoint
+        )
         self.skypilot_client_id = pulumi.Output.secret(self.skypilot_client.id)
         self.skypilot_client_secret = pulumi.Output.secret(
             self.skypilot_client.client_secret

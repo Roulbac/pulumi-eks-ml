@@ -191,6 +191,7 @@ sp = SkyPilotAPIServer(
 # ------------------------------------------------------------------------------
 # Outputs
 # ------------------------------------------------------------------------------
+pulumi.export("hub_vpc_cidr", vpc_network.vpcs[config.hub.region].vpc_cidr_block)
 pulumi.export(
     "clusters",
     [
