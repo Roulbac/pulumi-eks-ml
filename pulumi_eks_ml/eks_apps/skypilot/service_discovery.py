@@ -44,7 +44,6 @@ class SkyPilotServiceDiscovery(pulumi.ComponentResource):
             name=hostname,
             comment="Private hosted zone for SkyPilot service discovery.",
             vpcs=zone_vpcs,
-            force_destroy=True,
             opts=zone_opts
         )
 

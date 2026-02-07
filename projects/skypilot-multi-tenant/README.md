@@ -9,19 +9,18 @@ It deploys:
 - **SkyPilot Data Planes** (namespaces) provisioned across Hub and Spoke clusters.
 - **IAM Roles & Policies** for secure data plane access (IRSA).
 
-Use this project to stand up a production-ready SkyPilot platform that serves multiple tenants/teams across different regions.
+Use this project to stand up a SkyPilot platform that serves multiple tenants/teams across different regions.
 
 ## How it works
 
 The program in `__main__.py`:
 
-1.  **Networking**: Creates a global VPC group peered in a Hub-and-Spoke topology.
+1.  **Networking**: Creates a global VPC group peered in a Hub-and-Spoke topology. This is designed so that all infrastructure is to be provisioned in **private subnets**, with **Tailscale** used as a VPN to provide secure access to the VPCs from the internet.
 2.  **Clusters**: Deploys EKS clusters in the Hub and all Spoke regions with recommended addons (Karpenter, etc.).
 3.  **SkyPilot Provisioning**:
     -   **API Server**: Deploys the SkyPilot API server in the Hub cluster.
     -   **Data Planes**: Creates namespaces and Service Accounts in specified clusters to act as SkyPilot execution environments.
     -   **User Identities**: Configures IRSA (IAM Roles for Service Accounts) for each data plane, allowing fine-grained permissions (e.g., S3 access) for different tenants.
-4.  **Tailscale** (Optional): Can deploy a Tailscale subnet router in the Hub for secure private access.
 
 ## Configuration
 
@@ -30,12 +29,14 @@ Update `Pulumi.dev.yaml` (or your stack file) with the following structure:
 -   `hub`: Configuration for the primary region.
     -   `region`: AWS region (e.g., `us-west-2`).
     -   `node_pools`: List of node pools for the cluster.
--   `data_planes`: List of data planes (tenants) to provision in this region.
-    -   `tailscale`: (Optional) Tailscale configuration.
+    -   `skypilot`:
+        -   `data_planes`: List of data planes (tenants) to provision in this region. Each can optionally include a `user_role_arn`.
+    -   `tailscale`: Tailscale configuration for secure VPC access.
 -   `spokes`: List of spoke region configurations.
     -   `region`: AWS region.
     -   `node_pools`: Node pools for this region.
--   `data_planes`: List of data planes to provision here.
+    -   `skypilot`:
+        -   `data_planes`: List of data planes to provision here. Each can optionally include a `user_role_arn`.
 
 ### Example `Pulumi.dev.yaml`
 
@@ -53,16 +54,18 @@ config:
         capacity_type: spot
         instance_type: [g5.xlarge]
     # Define SkyPilot tenants/data planes for the Hub
-    data_planes:
-      - name: team-a-dev
-        # Optional: Bring your own IAM role ARN
-        # user_role_arn: arn:aws:iam::123456789012:role/TeamARole
-      - name: team-b-prod
+    skypilot:
+      ingress_host: skypilot.example.com
+      ingress_ssl_cert_arn: arn:aws:acm:us-west-2:123456789012:certificate/uuid
+      data_planes:
+        - name: team-a-dev
+          # Optional: Bring your own IAM role ARN
+          # user_role_arn: arn:aws:iam::123456789012:role/TeamARole
+        - name: team-b-prod
 
-    # Optional: Enable Tailscale Subnet Router
+    # Tailscale Subnet Router
     tailscale:
-      enabled: false
-      # oauth_secret_arn: arn:aws:secretsmanager:us-west-2:123...
+      oauth_secret_arn: arn:aws:secretsmanager:us-west-2:123...
 
   # Spoke Regions Configuration
   spokes:
@@ -71,15 +74,17 @@ config:
         - name: system
           capacity_type: on-demand
           instance_type: [t3.medium]
-      data_planes:
-        - name: team-a-latency-sensitive
+      skypilot:
+        data_planes:
+          - name: team-a-latency-sensitive
 
     - region: eu-west-1
       node_pools:
         - name: gpu-workers
           capacity_type: spot
           instance_type: [g5.2xlarge]
-      data_planes: [] # Just compute capacity, no specific tenant isolation required yet
+      skypilot:
+        data_planes: [] # Just compute capacity, no specific tenant isolation required yet
 ```
 
 ## Run it

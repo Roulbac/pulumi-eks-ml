@@ -1,10 +1,12 @@
 """
 Pulumi program for deploying a multi-region EKS architecture.
 
-This script sets up:
-1. A Hub-and-Spoke VPC topology spanning multiple regions.
-2. EKS clusters in each region (hub and spokes).
-3. Recommended EKS addons for each cluster.
+This script sets up a multi-region, multi-tenant SkyPilot architecture.
+The architecture is made of:
+- A Hub-and-Spoke VPC topology spanning multiple regions.
+- EKS clusters in separate regions
+- A tailscale subnet router so users can interact with the SkyPilot API server via Tailscale as a VPN.
+- A set of isolated dataplanes (namespaces on EKS clusters) where SkyPilot workloads can run.
 """
 
 import pulumi
@@ -153,7 +155,12 @@ sp_service_discovery = SkyPilotServiceDiscovery(
     hostname=config.hub.skypilot.ingress_host,
     vpc_ids=[vpc_network.vpcs[region].vpc_id for region in all_regions],
     vpc_regions=all_regions,
-    opts=pulumi.ResourceOptions(depends_on=[*cluster_dependencies, vpc_network]),
+    opts=pulumi.ResourceOptions(
+        # You'll need to manually delete the private hosted zone in Route 53 if you ran 'pulumi destroy'
+        # That's because it may still contain DNS records managed outside Pulumi.
+        retain_on_delete=True, 
+        depends_on=[*cluster_dependencies, vpc_network]
+    ),
 )
 
 sp_cognito_idp = SkyPilotCognitoIDP(
