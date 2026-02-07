@@ -140,13 +140,17 @@ Update `Pulumi.dev.yaml` (or your stack file) with the following structure:
     -   `node_pools`: Node pools for this region.
     -   `skypilot`:
         -   `data_planes`: List of data planes to provision here. Each can optionally include a `user_role_arn`.
+  
+**Notes:** 
+- Pulumi may automatically preprend `sp:` to the keys in your stack's YAML file.
+- No need to set `aws:region` as the program explicitly manages providers for each configured region.
 
 ### Example `Pulumi.dev.yaml`
 
 ```yaml
 config:
   # Hub Region Configuration
-  hub:
+  sp:hub:
     region: us-west-2
     node_pools:
       - name: system
@@ -171,7 +175,7 @@ config:
       oauth_secret_arn: arn:aws:secretsmanager:us-west-2:123...
 
   # Spoke Regions Configuration
-  spokes:
+  sp:spokes:
     - region: us-east-1
       node_pools:
         - name: system

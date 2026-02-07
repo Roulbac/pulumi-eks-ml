@@ -61,7 +61,7 @@ pulumi_config = pulumi.Config()
 config = load_project_config(pulumi_config)
 
 component_versions = eks.ComponentVersions(**config.component_versions)
-deployment_name = f"sp-{pulumi.get_stack()}"
+deployment_name = f"{pulumi.get_project()}-{pulumi.get_stack()}"
 all_regions = get_all_regions(config)
 
 # ------------------------------------------------------------------------------

@@ -85,20 +85,23 @@ Update `Pulumi.dev.yaml` (or your stack file) with these keys:
 -   `node_pools`: Array of node pool configurations applied to *all* clusters.
 -   `versions`: (Optional) Versions for Kubernetes, addons, etc.
 
-**Note:** You do not need to set `aws:region` as the program explicitly manages providers for each configured region.
+
+**Notes:** 
+- You do not need to set `aws:region` as the program explicitly manages providers for each configured region.
+- Pulumi may automatically preprend `multi-region:` to the keys in your stack's YAML file.
 
 ### Example `Pulumi.dev.yaml`
 
 ```yaml
 config:
   # List of regions to deploy to
-  regions:
+  multi-region:regions:
     - us-west-2
     - us-east-1
     - eu-west-1
   
   # Node pools (applied to every cluster)
-  node_pools:
+  multi-region:node_pools:
     - name: system
       capacity_type: on-demand
       instance_category: ["t"]

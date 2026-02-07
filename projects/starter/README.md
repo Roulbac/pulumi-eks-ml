@@ -86,10 +86,12 @@ Update `Pulumi.dev.yaml` (or your stack file) with these keys:
 Each node pool uses an `instance_type` list and can optionally set
 `instance_family` and `instance_category` lists. Example:
 
+**Note**: Pulumi may automatically preprend `starter:` to the keys in your stack's YAML file.
+
 ```yaml
 config:
   aws:region: us-west-2
-  node_pools:
+  starter:node_pools:
     - name: general
       capacity_type: on-demand
       instance_category: [t]

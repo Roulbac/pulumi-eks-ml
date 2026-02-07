@@ -1,6 +1,5 @@
 config:
-  pulumi:disable-autonaming: "true"
-  hub:
+  sp:hub:
     node_pools:
       - capacity_type: on-demand
         instance_category: [t]
@@ -19,4 +18,4 @@ config:
     tailscale:
       oauth_secret_arn: <TAILSCALE_OAUTH_SECRET_ARN>
   # Add regional deployments here under 'spokes' - the schema is the same as 'hub' for each region
-  spokes: []
+  sp:spokes: []
