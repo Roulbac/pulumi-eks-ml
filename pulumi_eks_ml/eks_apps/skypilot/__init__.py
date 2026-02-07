@@ -1,12 +1,12 @@
 """SkyPilot EKS applications."""
 
-from .api_server import SkyPilotAPIServer
-from .data_plane import SkyPilotDataPlaneProvisioner, SkyPilotDataPlaneRequest
-from .data_plane_irsa import (
+from .api_server import SkyPilotAPIServer, SkyPilotOAuthCredentials
+from .data_plane import (
+    SkyPilotDataPlaneProvisioner,
+    SkyPilotDataPlaneRequest,
     SkyPilotDataPlaneUserIdentityProvisioner,
     SkyPilotDataPlaneUserIdentityRequest,
 )
-from .credentials import SkyPilotOAuthCredentials
 from .idp import SkyPilotCognitoIDP
 from .service_discovery import SkyPilotServiceDiscovery
 
