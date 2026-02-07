@@ -11,6 +11,109 @@ It deploys:
 
 Use this project to stand up a SkyPilot platform that serves multiple tenants/teams across different regions.
 
+> **[See the Deployment Guide](./DEPLOYMENT.md) for step-by-step setup instructions.**
+
+## Architecture
+
+This solution creates a multi-region, private network for SkyPilot workloads.
+
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, ui-sans-serif, system-ui",
+    "fontSize": "14px",
+    "lineColor": "#94a3b8",
+    "textColor": "#1e293b"
+  },
+  "flowchart": { "curve": "basis" }
+}}%%
+
+flowchart LR
+    classDef hub   fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+    classDef spoke fill:#fae8ff,stroke:#a855f7,stroke-width:2px,color:#581c87;
+    classDef node  fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#1e293b;
+    classDef api   fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#064e3b;
+    classDef vpn   fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d;
+    classDef aws   fill:#ff9900,stroke:#b45309,stroke-width:1.5px,color:#fff,font-weight:bold;
+    classDef user  fill:#1e293b,stroke:#475569,stroke-width:2px,color:#e2e8f0;
+
+    User((User)):::user
+    Cognito[AWS Cognito]:::aws
+
+    subgraph HubVPC ["Hub VPC (Region X)"]
+        direction LR
+
+        subgraph HubEKS [EKS Cluster 1]
+            direction TB
+
+            Tailscale[Tailscale Subnet Router]:::vpn
+            API[SkyPilot API Server]:::api
+
+            subgraph HubWorkspaces [Workspaces]
+                direction LR
+                WA[Workspace A]:::node
+                WB[Workspace B]:::node
+            end
+
+            Tailscale --> API
+            API -.-> WA
+            API -.-> WB
+        end
+    end
+
+    subgraph SpokeRegion [ ]
+        direction TB
+        style SpokeRegion fill:none,stroke:none;
+
+        subgraph Spoke1 ["Spoke VPC (Region Z)"]
+            direction TB
+            subgraph EKS2 [EKS Cluster 2]
+                direction TB
+                WC[Workspace C]:::node
+                WD[Workspace D]:::node
+            end
+        end
+
+        subgraph Spoke2 ["Spoke VPC (Region Y)"]
+            direction TB
+            subgraph EKS3 [EKS Cluster 3]
+                direction TB
+                WE[Workspace E]:::node
+                WF[Workspace F]:::node
+            end
+        end
+    end
+
+    User -.->|Auth| Cognito
+    User ==>|VPN| Tailscale
+
+    API -.-> WC
+    API -.-> WD
+    API -.-> WE
+    API -.-> WF
+
+    HubVPC <-->|VPC Peering| Spoke1
+    HubVPC <-->|VPC Peering| Spoke2
+
+    class HubVPC hub;
+    class Spoke1,Spoke2 spoke;
+
+    %% Edge overrides (order matters)
+    %% 0: Tailscale --> API
+    %% 1: API -.-> WA
+    %% 2: API -.-> WB
+    %% 3: User -.-> Cognito
+    %% 4: User ==> Tailscale
+    %% 5-8: API -.-> WC/WD/WE/WF
+    %% 9-10: HubVPC <--> Spoke1/Spoke2
+    linkStyle 0 stroke:#059669,stroke-width:2.5px;
+    linkStyle 1,2,5,6,7,8 stroke:#64748b,stroke-width:2px,stroke-dasharray:5 4;
+    linkStyle 3 stroke:#f59e0b,stroke-width:2px,stroke-dasharray:6 4;
+    linkStyle 4 stroke:#16a34a,stroke-width:3.5px;
+    linkStyle 9,10 stroke:#6366f1,stroke-width:3.5px;
+```
+
 ## How it works
 
 The program in `__main__.py`:

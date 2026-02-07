@@ -50,6 +50,7 @@ def build_api_service_config(service_accounts_by_context: Mapping[str, str]) -> 
                 },
             },
             "jobs": {"controller": {"consolidation_mode": True}},
+            "rbac": {"default_role": "user"},
         }
     )
 

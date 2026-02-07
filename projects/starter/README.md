@@ -2,11 +2,71 @@
 
 This folder is a minimal Pulumi project that uses `pulumi_eks_ml` to create:
 
-- A single hub VPC (no spokes)
+- A single VPC with private subnets and a minimal public subnet for internet egress
 - A single EKS cluster
-- Recommended addons
+- Recommended addons (Storage CSI, ALB · DNS, Monitoring, NVIDIA, etc...)
 
 Use it as a reference or a starting point for your own topology.
+
+### Architecture
+
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, ui-sans-serif, system-ui",
+    "fontSize": "14px",
+    "lineColor": "#94a3b8",
+    "textColor": "#1e293b"
+  },
+  "flowchart": { "curve": "basis" }
+}}%%
+
+flowchart LR
+    classDef vpc   fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+    classDef eks   fill:#ede9fe,stroke:#8b5cf6,stroke-width:2px,color:#4c1d95;
+    classDef node  fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#1e293b;
+    classDef addon fill:#d1fae5,stroke:#059669,stroke-width:1.5px,color:#064e3b;
+    classDef infra fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#92400e;
+    classDef ext   fill:#1e293b,stroke:#475569,stroke-width:2px,color:#e2e8f0;
+
+    Internet((Internet)):::ext
+
+    subgraph VPC [VPC]
+        direction LR
+        NAT[NAT Gateway]:::infra
+
+        subgraph EKS [EKS Cluster]
+            direction TB
+
+            subgraph NodePools [Node Pools]
+                direction LR
+                NP1[General]:::node
+                NP2[GPU]:::node
+            end
+
+            subgraph Addons [Recommended Addons]
+                direction LR
+                A1[Storage CSI]:::addon
+                A2[ALB · DNS]:::addon
+                A3[Monitoring]:::addon
+                A4[NVIDIA]:::addon
+            end
+        end
+    end
+
+    Internet <-->|Egress| NAT
+    NAT ---|Private Subnets| EKS
+
+    class VPC vpc;
+    class EKS eks;
+
+    %% Edge overrides
+    %% 0: Internet <--> NAT
+    %% 1: NAT --- EKS
+    linkStyle 0 stroke:#d97706,stroke-width:2.5px;
+    linkStyle 1 stroke:#3b82f6,stroke-width:2px;
+```
 
 ### How it works
 
@@ -15,7 +75,6 @@ The program in `__main__.py`:
 - Reads the AWS region from `aws:region`
 - Generates a deployment name from the project + stack
 - Builds node pools from `node_pools` config
-- Creates hub networking and attaches EKS
 
 ### Configuration
 
