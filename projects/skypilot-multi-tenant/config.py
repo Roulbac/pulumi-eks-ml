@@ -8,9 +8,13 @@ from pydantic import BaseModel, Field, model_validator
 from pulumi_eks_ml import eks
 
 
+class SkyPilotConfig(BaseModel):
+    ingress_host: str
+    ingress_ssl_cert_arn: str
+    data_planes: list[DataPlaneConfig] = Field(default_factory=list)
+
 class TailscaleConfig(BaseModel):
-    enabled: bool = False
-    oauth_secret_arn: str | None = None
+    oauth_secret_arn: str
 
 
 class DataPlaneConfig(BaseModel):
@@ -21,7 +25,6 @@ class DataPlaneConfig(BaseModel):
 class RegionConfig(BaseModel):
     region: str
     node_pools: list[dict]
-    sp_data_planes: list[DataPlaneConfig] = Field(default_factory=list)
 
     @property
     def eks_node_pools(self) -> list[eks.NodePoolConfig]:
@@ -29,7 +32,8 @@ class RegionConfig(BaseModel):
 
 
 class HubConfig(RegionConfig):
-    tailscale: TailscaleConfig = Field(default_factory=TailscaleConfig)
+    skypilot: SkyPilotConfig
+    tailscale: TailscaleConfig
 
 
 class ProjectConfig(BaseModel):

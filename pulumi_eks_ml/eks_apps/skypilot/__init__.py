@@ -1,11 +1,14 @@
 """SkyPilot EKS applications."""
 
-from .api_server import SkyPilotAPIServer
-from .data_plane import SkyPilotDataPlaneProvisioner, SkyPilotDataPlaneRequest
-from .data_plane_irsa import (
+from .api_server import SkyPilotAPIServer, SkyPilotOAuthCredentials
+from .data_plane import (
+    SkyPilotDataPlaneProvisioner,
+    SkyPilotDataPlaneRequest,
     SkyPilotDataPlaneUserIdentityProvisioner,
     SkyPilotDataPlaneUserIdentityRequest,
 )
+from .idp import SkyPilotCognitoIDP
+from .service_discovery import SkyPilotServiceDiscovery
 
 __all__ = [
     "SkyPilotAPIServer",
@@ -13,4 +16,7 @@ __all__ = [
     "SkyPilotDataPlaneRequest",
     "SkyPilotDataPlaneUserIdentityProvisioner",
     "SkyPilotDataPlaneUserIdentityRequest",
+    "SkyPilotCognitoIDP",
+    "SkyPilotOAuthCredentials",
+    "SkyPilotServiceDiscovery",
 ]

@@ -1,16 +1,21 @@
 config:
-  pulumi:disable-autonaming: "true"
-  hub:
-    region: us-east-2
-    sp_data_planes:
-      - name: team-a
-      - name: team-b
-      - name: team-c
+  sp:hub:
     node_pools:
       - capacity_type: on-demand
         instance_category: [t]
         name: general
+      - capacity_type: on-demand
+        instance_category: [g]
+        name: gpu
+    region: us-east-2
+    skypilot:
+      ingress_host: <YOUR_DEPLOYMENT_NAME> (e.g. "skypilot.example.com")
+      ingress_ssl_cert_arn: <SSL_CERT_ARN>
+      data_planes: 
+      - name: team-a
+      - name: team-b
+      - name: team-c
     tailscale:
-      enabled: true
-      oauth_secret_arn: <YOUR_TAILSCALE_OAUTH_SECRET_ARN>
-  spokes: []
+      oauth_secret_arn: <TAILSCALE_OAUTH_SECRET_ARN>
+  # Add regional deployments here under 'spokes' - the schema is the same as 'hub' for each region
+  sp:spokes: []

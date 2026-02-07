@@ -1,5 +1,5 @@
-name: multi-region
-description: A multi-region project with one VPC and one EKS cluster per region, peered in a full mesh topology.
+name: sp
+description: A SkyPilot multi-tenant multi-region deployment, running on EKS and Tailscale.
 runtime:
   name: python
   options:

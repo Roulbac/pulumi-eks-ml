@@ -13,6 +13,14 @@ This project treats infrastructure as a **composable library**. Instead of one g
 
 Whether it's a single cluster for testing or a global mesh for distributed workloads, you can define your architecture once in Python, then deploy identical copies across different environments thanks to Pulumi stacks.
 
+## Architectural examples with `pulumi_eks_ml`
+
+| Project | Description | Architecture |
+|---------|-------------|:------------:|
+| [**Starter**](./projects/starter/) | Single VPC, single EKS cluster with recommended addons. | [diagram](./projects/starter/README.md#architecture) |
+| [**EKS Multi-Region**](./projects/multi-region/) | Full-mesh VPC peering across regions, each with an EKS cluster. | [diagram](./projects/multi-region/README.md#architecture) |
+| [**SkyPilot Multi-Tenant**](./projects/skypilot-multi-tenant/) | Hub-and-Spoke multi-region network with multi-tenant SkyPilot API server, Cognito auth, Tailscale VPN, and isolated data planes. | [diagram](./projects/skypilot-multi-tenant/README.md#architecture) |
+
 ## ⚡ Quickstart
 
 Use the starter project as the fastest path to a working EKS cluster.

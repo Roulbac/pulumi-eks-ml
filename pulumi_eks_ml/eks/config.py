@@ -19,6 +19,7 @@ EBS_CSI_VERSION = "2.54.1"
 METRICS_SERVER_VERSION = "3.13.0"
 NVIDIA_DEVICE_PLUGIN_VERSION = "0.18.2"
 EFS_CSI_VERSION = "3.3.0"
+EXTERNAL_DNS_VERSION = "1.20.0"
 
 # Application versions
 TAILSCALE_OPERATOR_VERSION = "1.92.5"
@@ -190,6 +191,7 @@ class ComponentVersions:
     metrics_server: str = METRICS_SERVER_VERSION
     nvidia_device_plugin: str = NVIDIA_DEVICE_PLUGIN_VERSION
     efs_csi: str = EFS_CSI_VERSION
+    external_dns: str = EXTERNAL_DNS_VERSION
     coredns: str | None = None
     kube_proxy: str | None = None
     vpc_cni: str | None = None

@@ -1,10 +1,12 @@
 """
 Pulumi program for deploying a multi-region EKS architecture.
 
-This script sets up:
-1. A Hub-and-Spoke VPC topology spanning multiple regions.
-2. EKS clusters in each region (hub and spokes).
-3. Recommended EKS addons for each cluster.
+This script sets up a multi-region, multi-tenant SkyPilot architecture.
+The architecture is made of:
+- A Hub-and-Spoke VPC topology spanning multiple regions.
+- EKS clusters in separate regions
+- A tailscale subnet router so users can interact with the SkyPilot API server via Tailscale as a VPN.
+- A set of isolated dataplanes (namespaces on EKS clusters) where SkyPilot workloads can run.
 """
 
 import pulumi
@@ -12,10 +14,12 @@ import pulumi
 from pulumi_eks_ml import eks, eks_addons, eks_apps, vpc
 from pulumi_eks_ml.eks_apps.skypilot import (
     SkyPilotAPIServer,
+    SkyPilotCognitoIDP,
     SkyPilotDataPlaneProvisioner,
     SkyPilotDataPlaneRequest,
     SkyPilotDataPlaneUserIdentityProvisioner,
     SkyPilotDataPlaneUserIdentityRequest,
+    SkyPilotServiceDiscovery,
 )
 
 from config import get_all_regions, load_project_config
@@ -57,7 +61,7 @@ pulumi_config = pulumi.Config()
 config = load_project_config(pulumi_config)
 
 component_versions = eks.ComponentVersions(**config.component_versions)
-deployment_name = f"sp-{pulumi.get_stack()}"
+deployment_name = f"{pulumi.get_project()}-{pulumi.get_stack()}"
 all_regions = get_all_regions(config)
 
 # ------------------------------------------------------------------------------
@@ -104,15 +108,14 @@ for spoke in config.spokes:
 # ------------------------------------------------------------------------------
 # Tailscale (Hub Only)
 # ------------------------------------------------------------------------------
-if config.hub.tailscale.enabled:
-    eks_apps.TailscaleSubnetRouter(
-        name=f"{deployment_name}-{config.hub.region}-ts",
-        cluster=hub_cluster,
-        oauth_secret_arn=config.hub.tailscale.oauth_secret_arn,
-        advertised_routes=[vpc_network.vpcs[r].vpc_cidr_block for r in all_regions],
-        version=component_versions.tailscale_operator,
-        opts=pulumi.ResourceOptions(depends_on=cluster_dependencies),
-    )
+eks_apps.TailscaleSubnetRouter(
+    name=f"{deployment_name}-{config.hub.region}-ts",
+    cluster=hub_cluster,
+    oauth_secret_arn=config.hub.tailscale.oauth_secret_arn,
+    advertised_routes=[vpc_network.vpcs[r].vpc_cidr_block for r in all_regions],
+    version=component_versions.tailscale_operator,
+    opts=pulumi.ResourceOptions(depends_on=cluster_dependencies),
+)
 
 # ------------------------------------------------------------------------------
 # SkyPilot
@@ -122,7 +125,7 @@ identity_requests: list[SkyPilotDataPlaneUserIdentityRequest] = []
 
 for region_config in [config.hub, *config.spokes]:
     cluster, _ = clusters[region_config.region]
-    for dp in region_config.sp_data_planes:
+    for dp in region_config.skypilot.data_planes:
         dp_requests.append(SkyPilotDataPlaneRequest(cluster=cluster, namespace=dp.name))
 
         policies = [] if dp.user_role_arn else _DEFAULT_USER_POLICIES
@@ -147,9 +150,38 @@ dp_provisioner = SkyPilotDataPlaneProvisioner(
     opts=pulumi.ResourceOptions(depends_on=cluster_dependencies),
 )
 
+sp_service_discovery = SkyPilotServiceDiscovery(
+    name=f"{deployment_name}-sp-service-discovery",
+    hostname=config.hub.skypilot.ingress_host,
+    vpc_ids=[vpc_network.vpcs[region].vpc_id for region in all_regions],
+    vpc_regions=all_regions,
+    opts=pulumi.ResourceOptions(
+        # You'll need to manually delete the private hosted zone in Route 53 if you ran 'pulumi destroy'
+        # That's because it may still contain DNS records managed outside Pulumi.
+        retain_on_delete=True, 
+        depends_on=[*cluster_dependencies, vpc_network]
+    ),
+)
+
+sp_cognito_idp = SkyPilotCognitoIDP(
+    name=f"{deployment_name}-sp-cognito",
+    region=config.hub.region,
+    callback_url=f"https://{config.hub.skypilot.ingress_host}/oauth2/callback",
+    opts=pulumi.ResourceOptions(
+        depends_on=[*cluster_dependencies],
+    ),
+)
+
+hub_cluster, _ = clusters[config.hub.region]
+
 sp = SkyPilotAPIServer(
     name=f"{deployment_name}-sp-api-server",
-    cluster=clusters[config.hub.region][0],
+    cluster=hub_cluster,
+    ingress_host=config.hub.skypilot.ingress_host,
+    ingress_ssl_cert_arn=config.hub.skypilot.ingress_ssl_cert_arn,
+    oidc_issuer_url=sp_cognito_idp.oidc_issuer_url,
+    oidc_client_id=sp_cognito_idp.skypilot_client_id,
+    oidc_client_secret=sp_cognito_idp.skypilot_client_secret,
     kubeconfig=dp_provisioner.api_server_kube_config,
     service_accounts_by_context=user_identities.service_accounts_by_context,
     opts=pulumi.ResourceOptions(
@@ -157,6 +189,8 @@ sp = SkyPilotAPIServer(
             *cluster_dependencies,
             dp_provisioner,
             user_identities,
+            sp_service_discovery,
+            sp_cognito_idp,
         ]
     ),
 )
@@ -164,6 +198,7 @@ sp = SkyPilotAPIServer(
 # ------------------------------------------------------------------------------
 # Outputs
 # ------------------------------------------------------------------------------
+pulumi.export("hub_vpc_cidr", vpc_network.vpcs[config.hub.region].vpc_cidr_block)
 pulumi.export(
     "clusters",
     [
