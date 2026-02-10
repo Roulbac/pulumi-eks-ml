@@ -9,12 +9,7 @@ config:
         name: gpu
     region: us-east-2
     skypilot:
-      ingress_host: <YOUR_DEPLOYMENT_NAME> (e.g. "skypilot.example.com")
-      ingress_ssl_cert_arn: <SSL_CERT_ARN>
-      data_planes: 
-      - name: team-a
-      - name: team-b
-      - name: team-c
+      default_user_role: admin
     tailscale:
       oauth_secret_arn: <TAILSCALE_OAUTH_SECRET_ARN>
   # Add regional deployments here under 'spokes' - the schema is the same as 'hub' for each region

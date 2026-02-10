@@ -26,17 +26,15 @@ class SkyPilotCognitoIDP(pulumi.ComponentResource):
         super().__init__("pulumi-eks-ml:eks:SkyPilotCognitoIDP", name, None, opts)
 
         provider = aws.Provider(f"{name}-cognito-provider", region=region, opts=opts)
-        resource_opts = (opts or pulumi.ResourceOptions()).merge(
-            pulumi.ResourceOptions(parent=self, provider=provider)
+        resource_opts = (
+            (opts or pulumi.ResourceOptions())
+            .merge(pulumi.ResourceOptions(parent=self, provider=provider))
         )
 
         self.user_pool = aws.cognito.UserPool(
             f"{name}-pool",
             name=f"{name}-pool",
-            alias_attributes=["email", "preferred_username"],
-            admin_create_user_config=aws.cognito.UserPoolAdminCreateUserConfigArgs(
-                allow_admin_create_user_only=True
-            ),
+            admin_create_user_config=aws.cognito.UserPoolAdminCreateUserConfigArgs(allow_admin_create_user_only=True),
             opts=resource_opts,
         )
 
@@ -94,7 +92,8 @@ class SkyPilotCognitoIDP(pulumi.ComponentResource):
         self.user_pool_name = self.user_pool.name
         self.user_pool_region = self.user_pool.region
         self.oidc_issuer_url = pulumi.Output.format(
-            "https://{}", self.user_pool.endpoint
+            "https://{}",
+            self.user_pool.endpoint
         )
         self.skypilot_client_id = pulumi.Output.secret(self.skypilot_client.id)
         self.skypilot_client_secret = pulumi.Output.secret(

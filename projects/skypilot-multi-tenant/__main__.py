@@ -179,6 +179,7 @@ sp = SkyPilotAPIServer(
     cluster=hub_cluster,
     ingress_host=config.hub.skypilot.ingress_host,
     ingress_ssl_cert_arn=config.hub.skypilot.ingress_ssl_cert_arn,
+    default_user_role=config.hub.skypilot.default_user_role,
     oidc_issuer_url=sp_cognito_idp.oidc_issuer_url,
     oidc_client_id=sp_cognito_idp.skypilot_client_id,
     oidc_client_secret=sp_cognito_idp.skypilot_client_secret,
@@ -210,7 +211,6 @@ pulumi.export(
         for region, (cluster, _) in clusters.items()
     ],
 )
-pulumi.export("skypilot_ingress_status", sp.ingress_status)
 pulumi.export("skypilot_api_service_config", sp.api_service_config)
 pulumi.export("skypilot_admin_username", sp.admin_username)
 pulumi.export("skypilot_admin_password", sp.admin_password)
