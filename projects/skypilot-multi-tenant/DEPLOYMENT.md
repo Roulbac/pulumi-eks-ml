@@ -79,6 +79,8 @@ Ensure you have the following installed:
     *   `hub.skypilot.ingress_host`: The domain name for the SkyPilot API (e.g., `skypilot.my-domain.com`).
         *   **Important**: Ensure your ACM certificate covers this domain. If you use a subdomain for the API server (e.g., `api.example.com`), the certificate must list that specific subdomain or use a wildcard (e.g., `*.example.com`).
     *   `hub.skypilot.ingress_ssl_cert_arn`: The ARN of the ACM certificate created in the prerequisites.
+    *   `hub.skypilot.default_user_role`: **Must be `admin` for the initial deployment** so the first users who sign in can manage access.
+        *   After at least one real admin user exists, change this value to `user` and redeploy (`uv run pulumi up`) so future users are created with least privilege.
     *   `hub.tailscale.oauth_secret_arn`: The ARN of the Secrets Manager secret containing your Tailscale OAuth client secret.
         *   *Note: While you can provide the secret directly or use Pulumi config secrets, using an ARN reference to Secrets Manager is recommended for security.*
 
@@ -92,6 +94,7 @@ Ensure you have the following installed:
         skypilot:
           ingress_host: "skypilot.example.com"
           ingress_ssl_cert_arn: "arn:aws:acm:us-west-2:123456789012:certificate/..."
+          default_user_role: "admin"
         # ... other config
     ```
 
@@ -136,7 +139,7 @@ To resolve the private `ingress_host` domain, you must configure Tailscale to us
 
     ![Tailscale DNS Settings](./assets/tailscale-dns.png)
 
-### 2. User Setup (Cognito)
+### 2. First User Creation (Admin)
 
 The deployment creates a Cognito User Pool for authentication.
 
@@ -149,18 +152,45 @@ The deployment creates a Cognito User Pool for authentication.
     ![Create User in Cognito](./assets/cognito-create-user.png)
 4.  **Log in**: Access the SkyPilot dashboard URL (e.g., `https://skypilot.example.com`) and log in with the user created above. This initializes your account record. You will notice that you start off with the "user" privilege level. To grant yourself admin privileges, you need to port-forward to the API server and grant the admin role, see below.
 
-### 3. Admin Privilege Escalation
+### 3. Switch default role to `user` after bootstrap
 
-By default, new users have the "user" role. To become a SkyPilot Admin:
+For first-time bootstrap, keep `hub.skypilot.default_user_role: admin` so initial sign-ins can administer the system.
 
-1.  **Port-Forward**: You need local access to the API server to bypass standard auth checks or access the admin interface directly.
-    *   Find the API Server pod in the Hub cluster.
-    *   Run:
-        ```bash
-        kubectl -n <SKYPILOT_NAMESPACE> port-forward pod/<SKYPILOT_POD_NAME> 46580:46580
-        ```
-2.  **Access Local Dashboard**:
-    *   Open `http://127.0.0.1:46580/dashboard` in your browser.
-3.  **Grant Admin**:
-    *   In this local session, navigate to the Users management section.
-    *   Find your user and grant the **Admin** role.
+Once you have confirmed that **at least one admin user exists**, lock down onboarding defaults:
+
+1.  **Update config**:
+    *   In `Pulumi.dev.yaml`, set `hub.skypilot.default_user_role: user`.
+2.  **Redeploy the stack**:
+    ```bash
+    uv run pulumi up
+    ```
+3.  **Verify behavior**:
+    *   New users should now be created with the `user` role by default.
+
+> **Warning**: Do not switch `default_user_role` to `user` until you have created and verified at least one admin account, or you may lock yourself out of admin-only operations.
+
+---
+
+## Troubleshooting
+
+### Recover admin access via pod shell + local port-forward
+
+If admin permissions are misconfigured, you can use an internal maintenance path through the API server pod.
+
+1.  **Find the API server pod**:
+    ```bash
+    kubectl -n <SKYPILOT_NAMESPACE> get pods
+    ```
+2.  **Open a shell in the pod** (SSH-like access in Kubernetes):
+    ```bash
+    kubectl -n <SKYPILOT_NAMESPACE> exec -it <SKYPILOT_POD_NAME> -- /bin/bash
+    ```
+3.  **Port-forward the API server locally**:
+    ```bash
+    kubectl -n <SKYPILOT_NAMESPACE> port-forward pod/<SKYPILOT_POD_NAME> 46580:46580
+    ```
+4.  **Use local dashboard access**:
+    *   Open `http://127.0.0.1:46580/dashboard`.
+    *   Use the default `root` path for local recovery access, then restore at least one real admin user.
+5.  **Re-harden configuration**:
+    *   Keep `hub.skypilot.default_user_role` aligned with your intended security posture (`user` for normal operation after bootstrap).

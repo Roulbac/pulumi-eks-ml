@@ -222,6 +222,5 @@ After deployment, the stack will export:
 
 -   `skypilot_api_service_config`: The endpoint URL and configuration for the SkyPilot API.
 -   `skypilot_admin_username` / `password`: Credentials for the SkyPilot API.
--   `skypilot_ingress_status`: Status of the LoadBalancer/Ingress.
 -   `clusters`: Details of provisioned EKS clusters.
 -   `skypilot_data_planes`: Details of provisioned data planes and their IAM roles.

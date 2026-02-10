@@ -9,6 +9,7 @@ config:
         name: gpu
     region: us-east-2
     skypilot:
+      default_user_role: admin
       ingress_host: <YOUR_DEPLOYMENT_NAME> (e.g. "skypilot.example.com")
       ingress_ssl_cert_arn: <SSL_CERT_ARN>
       data_planes: 

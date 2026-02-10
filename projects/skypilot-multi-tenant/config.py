@@ -11,6 +11,7 @@ from pulumi_eks_ml import eks
 class SkyPilotConfig(BaseModel):
     ingress_host: str
     ingress_ssl_cert_arn: str
+    default_user_role: str
     data_planes: list[DataPlaneConfig] = Field(default_factory=list)
 
 class TailscaleConfig(BaseModel):

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Sequence
+
 import pulumi
 import pulumi_aws as aws
 
@@ -17,8 +19,8 @@ class SkyPilotServiceDiscovery(pulumi.ComponentResource):
         self,
         name: str,
         hostname: pulumi.Input[str],
-        vpc_ids: list[pulumi.Input[str]],
-        vpc_regions: list[pulumi.Input[str]] | None = None,
+        vpc_ids: Sequence[pulumi.Input[str]],
+        vpc_regions: Sequence[pulumi.Input[str]] | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         super().__init__("pulumi-eks-ml:eks:SkyPilotServiceDiscovery", name, None, opts)

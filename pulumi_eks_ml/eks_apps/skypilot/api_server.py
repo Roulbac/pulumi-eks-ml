@@ -34,7 +34,10 @@ def build_aws_credentials_secret(cluster_region: str, irsa_role_arn: str) -> str
     )
 
 
-def build_api_service_config(service_accounts_by_context: Mapping[str, str]) -> str:
+def build_api_service_config(
+    service_accounts_by_context: Mapping[str, str],
+    default_user_role: str,
+) -> str:
     """Build the SkyPilot API service YAML config payload."""
     return yaml.safe_dump(
         {
@@ -50,7 +53,7 @@ def build_api_service_config(service_accounts_by_context: Mapping[str, str]) -> 
                 },
             },
             "jobs": {"controller": {"consolidation_mode": True}},
-            "rbac": {"default_role": "user"},
+            "rbac": {"default_role": default_user_role},
         }
     )
 
@@ -398,7 +401,6 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
     admin_password: pulumi.Output[str]
     admin_secret_arn: pulumi.Output[str]
     api_service_config: pulumi.Output[str]
-    ingress_status: pulumi.Output[dict]
 
     def __init__(
         self,
@@ -411,6 +413,7 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
         oidc_client_id: pulumi.Input[str],
         oidc_client_secret: pulumi.Input[str],
         service_accounts_by_context: pulumi.Input[Mapping[str, str]],
+        default_user_role: pulumi.Input[str],
         version: str = SKYPILOT_API_SERVER_VERSION,
         namespace: str = "skypilot",
         opts: pulumi.ResourceOptions | None = None,
@@ -518,6 +521,7 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
 
         self.api_service_config = pulumi.Output.all(
             service_accounts_by_context=service_accounts_by_context,
+            default_user_role=default_user_role,
         ).apply(lambda kwargs: build_api_service_config(**kwargs))
 
         values = pulumi.Output.all(
@@ -556,15 +560,6 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
             ),
         )
 
-        self.ingress = k8s.networking.v1.Ingress.get(
-            "skypilot-ingress",
-            pulumi.Output.concat(
-                self.release.namespace, "/", self.release.name, "-ingress"
-            ),
-            opts=k8s_opts,
-        )
-        self.ingress_status = self.ingress.status
-
         # Expose outputs
         self.admin_username = admin_credentials.username
         self.admin_password = admin_credentials.password
@@ -576,6 +571,5 @@ class SkyPilotAPIServer(pulumi.ComponentResource):
                 "admin_username": self.admin_username,
                 "admin_password": self.admin_password,
                 "admin_secret_arn": self.admin_secret_arn,
-                "ingress_status": self.ingress.status,
             }
         )
