@@ -1,3 +1,5 @@
+from typing import Sequence
+
 import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as k8s
@@ -62,7 +64,7 @@ def install_efs_csi_driver(
 
 def create_default_efs_fs_and_sc(
     name: str,
-    subnet_ids: pulumi.Input[list[str]],
+    subnet_ids: pulumi.Input[Sequence[pulumi.Input[str]]],
     node_security_group_id: pulumi.Input[str],
     aws_provider: aws.Provider,
     k8s_provider: k8s.Provider,
@@ -84,7 +86,7 @@ def create_default_efs_fs_and_sc(
     )
 
     def create_mount_targets(
-        subnet_ids: list[str],
+        subnet_ids: Sequence[str],
         node_security_group_id: str,
     ) -> list[aws.efs.MountTarget]:
         mount_targets = []
@@ -143,7 +145,7 @@ class EFSCSIAddon(pulumi.ComponentResource, EKSClusterAddon):
         name: str,
         oidc_provider_arn: pulumi.Input[str],
         oidc_issuer: pulumi.Input[str],
-        subnet_ids: pulumi.Input[list[str]],
+        subnet_ids: pulumi.Input[Sequence[pulumi.Input[str]]],
         node_security_group_id: pulumi.Input[str],
         opts: pulumi.ResourceOptions,
         version: str = config.EFS_CSI_VERSION,

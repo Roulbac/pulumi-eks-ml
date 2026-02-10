@@ -1,4 +1,5 @@
 import json
+from typing import Sequence
 
 import pulumi
 import pulumi_aws as aws
@@ -21,17 +22,20 @@ class TailscaleSubnetRouter(pulumi.ComponentResource):
         name: str,
         cluster: EKSCluster,
         oauth_secret_arn: pulumi.Input[str],
-        advertised_routes: list[pulumi.Input[str]],
+        advertised_routes: Sequence[pulumi.Input[str]],
         version: str | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ):
-        super().__init__("pulumi-eks-ml:eks_apps:TailscaleSubnetRouter",name, None, opts)
+        super().__init__("pulumi-eks-ml:eks_apps:TailscaleSubnetRouter", name, None, opts)
 
-        # Get OAuth client ID and secret from AWS Secrets Manager
-        secret = json.loads(
-            aws.secretsmanager.get_secret_version(
-                secret_id=oauth_secret_arn,
-            ).secret_string
+        # Get OAuth client ID and secret from AWS Secrets Manager.
+        # Use the Output variant so `oauth_secret_arn` can be a dynamic Pulumi input.
+        secret = aws.secretsmanager.get_secret_version_output(
+            secret_id=oauth_secret_arn,
+        ).secret_string.apply(
+            lambda payload: json.loads(payload)
+            if payload
+            else (_ for _ in ()).throw(ValueError("oauth_secret_arn resolved to an empty secret payload"))
         )
 
         resource_opts = pulumi.ResourceOptions(
@@ -55,8 +59,8 @@ class TailscaleSubnetRouter(pulumi.ComponentResource):
                 "namespace": namespace.metadata["name"],
             },
             string_data={
-                "client_id": secret["CLIENT_ID"],
-                "client_secret": secret["CLIENT_SECRET"],
+                "client_id": secret.apply(lambda value: value["CLIENT_ID"]),
+                "client_secret": secret.apply(lambda value: value["CLIENT_SECRET"]),
             },
             opts=resource_opts.merge(pulumi.ResourceOptions(depends_on=[namespace])),
         )

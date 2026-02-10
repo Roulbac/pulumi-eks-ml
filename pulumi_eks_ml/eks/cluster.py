@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from abc import ABC, abstractmethod
 from textwrap import dedent
-from typing import ClassVar
+from typing import ClassVar, Sequence
 
 import pulumi
 import pulumi_aws as aws
@@ -34,9 +34,9 @@ class EKSCluster(pulumi.ComponentResource):
         self,
         name: str,
         vpc_id: pulumi.Input[str],
-        subnet_ids: pulumi.Input[list[str]],
+        subnet_ids: pulumi.Input[Sequence[pulumi.Input[str]]],
         node_pools: list[config.NodePoolConfig],
-        region: str | None = None,
+        region: pulumi.Input[str] | None = None,
         versions: config.ComponentVersions | None = None,
         opts: pulumi.ResourceOptions | None = None,
     ):
@@ -48,7 +48,7 @@ class EKSCluster(pulumi.ComponentResource):
         self.subnet_ids = subnet_ids
         self.vpc_id = vpc_id
         self.name = name
-        self.region = region or aws.get_region().region
+        self.region = pulumi.Output.from_input(region or aws.get_region().region)
         self.k8s_name = self.name
         self.node_pools = node_pools
 

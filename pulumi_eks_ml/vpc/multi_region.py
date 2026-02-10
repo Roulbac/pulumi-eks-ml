@@ -138,7 +138,7 @@ class VPCPeeredGroup(pulumi.ComponentResource):
         - "full_mesh": Every VPC connects to every other VPC.
     """
 
-    vpc_cidrs: pulumi.Output[dict[str, str]]
+    vpc_cidrs: dict[str, str]
     vpcs: dict[str, VPC]
     peering_connection_ids: pulumi.Output[list[str]]
 

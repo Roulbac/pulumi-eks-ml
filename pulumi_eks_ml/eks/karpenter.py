@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 import pulumi
 import pulumi_aws as aws
@@ -266,7 +266,7 @@ class KarpenterAddon(pulumi.ComponentResource):
         oidc_provider_arn: pulumi.Input[str],
         oidc_issuer: pulumi.Input[str],
         node_security_group_id: pulumi.Input[str],
-        subnet_ids: pulumi.Input[list[str]],
+        subnet_ids: pulumi.Input[Sequence[pulumi.Input[str]]],
         opts: pulumi.ResourceOptions,
         node_pool_configs: list[config.NodePoolConfig] | None = None,
         karpenter_version: str = config.KARPENTER_VERSION,

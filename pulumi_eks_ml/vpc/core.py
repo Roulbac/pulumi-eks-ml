@@ -83,7 +83,7 @@ class VPC(pulumi.ComponentResource):
         if public_subnet := getattr(self, "public_subnet", None):
             self.public_subnet_id = public_subnet.id
         else:
-            self.public_subnet_id = None
+            self.public_subnet_id = pulumi.Output.from_input(None)
 
         # Register outputs
         self.register_outputs(
